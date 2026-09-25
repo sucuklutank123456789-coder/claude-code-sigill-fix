@@ -12,6 +12,8 @@ That crash is a `SIGILL`. This script works around it by running those binaries 
 
 > **Not an official Anthropic tool.** It modifies installed files of Claude Code and related apps. Use at your own risk.
 
+> ⚠️ **Expect Claude Code to run much slower than normal.** Every instruction the CPU lacks is emulated in software, so startup can take about a minute (even `claude --version`), and commands, tool calls and the IDE integrations respond noticeably slower than on a modern CPU. This fix makes Claude Code *work* on old hardware; it cannot make it fast.
+
 ## What it fixes
 
 | # | Target | What the script does |
@@ -160,3 +162,7 @@ This puts the original binaries back, resets the timeouts to their defaults and 
 - Intel Core 2 Duo E8400, Garuda Linux (Arch-based)
 
 Other distributions should work the same way but have not been tested yet. Reports are welcome.
+
+## License
+
+[MIT](LICENSE)
