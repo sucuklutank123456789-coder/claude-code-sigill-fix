@@ -11,6 +11,9 @@
 #
 # Safe to re-run: it only touches what an update has broken.
 #
+# If Intel SDE is missing, it offers to install it (AUR on Arch-based
+# systems, otherwise the Linux tarball from Intel into ~/.local/opt/intel-sde).
+#
 # Targets (pick them from the menu, or pass the numbers as arguments,
 # e.g. `./claude-sigill-fix.sh 4 1`):
 #   1. Terminal CLI (npm global install)
@@ -75,12 +78,81 @@ else
 fi
 
 # --- Requirement: Intel SDE --------------------------------------------------
-SDE="$(command -v intel-sde || command -v sde64 || command -v sde || true)"
+SDE_PAGE="https://www.intel.com/content/www/us/en/download/684897/intel-software-development-emulator.html"
+SDE_HOME="$HOME/.local/opt/intel-sde"
+
+find_sde() {
+    command -v intel-sde || command -v sde64 || command -v sde \
+        || { [[ -x "$SDE_HOME/sde64" ]] && echo "$SDE_HOME/sde64"; } || true
+}
+
+fetch() {  # fetch URL [OUTFILE]; prints to stdout when OUTFILE is omitted
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL -A 'Mozilla/5.0' ${2:+-o "$2"} "$1"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -U 'Mozilla/5.0' -O "${2:--}" "$1"
+    else
+        echo "${RED}curl or wget is required to download SDE.${RESET}" >&2
+        return 1
+    fi
+}
+
+# Generic install: download the Linux tarball from Intel into ~/.local/opt/intel-sde.
+install_sde_generic() {
+    local url tmp
+    echo "Looking up the latest Intel SDE release..."
+    url="$(fetch "$SDE_PAGE" | grep -oE 'https://downloadmirror\.intel\.com/[0-9]+/sde-external-[0-9.]+-[0-9-]+-lin\.tar\.(xz|bz2)' \
+           | sort -uV | tail -1)"
+    if [[ -z "$url" ]]; then
+        echo "${RED}Could not find the download link automatically.${RESET}"
+        echo "Download the Linux .tar.xz manually from:"
+        echo "  $SDE_PAGE"
+        echo "then extract it to $SDE_HOME (so that $SDE_HOME/sde64 exists) and re-run this script."
+        return 1
+    fi
+    echo "Downloading $url"
+    tmp="$(mktemp -d)"
+    if fetch "$url" "$tmp/sde.tar" && mkdir -p "$SDE_HOME" \
+        && tar -xf "$tmp/sde.tar" -C "$SDE_HOME" --strip-components=1; then
+        rm -rf "$tmp"
+        [[ -x "$SDE_HOME/sde64" ]]
+    else
+        rm -rf "$tmp"
+        echo "${RED}Download or extraction failed.${RESET}"
+        return 1
+    fi
+}
+
+install_sde() {
+    local distro="" aur
+    [[ -r /etc/os-release ]] && distro="$(. /etc/os-release; echo "${ID:-} ${ID_LIKE:-}")"
+    if [[ " $distro " == *" arch "* ]]; then
+        aur="$(command -v paru || command -v yay || true)"
+        if [[ -n "$aur" ]]; then
+            echo "Arch-based system detected, running: $(basename "$aur") -S intel-sde"
+            "$aur" -S intel-sde && return 0
+            echo "${YELLOW}AUR install failed, falling back to Intel's download.${RESET}"
+        fi
+    fi
+    # No distro packages SDE outside the AUR, so everyone else uses Intel's tarball.
+    install_sde_generic
+}
+
+SDE="$(find_sde)"
 if [[ -z "$SDE" ]]; then
-    echo "${RED}Intel SDE not found.${RESET}"
-    echo "Install it first (Arch: paru -S intel-sde), or download it from Intel"
-    echo "and put the 'sde64' binary on your PATH."
-    exit 1
+    echo "${RED}Intel SDE not found.${RESET} The fix does not work without SDE."
+    echo "SDE is Intel software under Intel's own license; installing it means you accept that license."
+    ANSWER=""
+    [[ -t 0 ]] && read -r -p "Do you want to install SDE now? [y/N]: " ANSWER
+    if [[ "$ANSWER" =~ ^[Yy]$ ]] && install_sde; then
+        SDE="$(find_sde)"
+    fi
+    if [[ -z "$SDE" ]]; then
+        echo "SDE is not installed. Install it (Arch: paru -S intel-sde, others: $SDE_PAGE)"
+        echo "and re-run this script."
+        exit 1
+    fi
+    echo "${GREEN}Intel SDE installed:${RESET} $SDE"
 fi
 
 is_elf() {
