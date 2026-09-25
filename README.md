@@ -14,12 +14,22 @@ That crash is a `SIGILL`. This script works around it by running those binaries 
 
 > ⚠️ **Expect Claude Code to run much slower than normal.** Every instruction the CPU lacks is emulated in software, so startup can take about a minute (even `claude --version`), and commands, tool calls and the IDE integrations respond noticeably slower than on a modern CPU. This fix makes Claude Code *work* on old hardware; it cannot make it fast.
 
+## Repository layout
+
+```
+Claude-Code/Linux/fix/                    the fix script
+Claude-Code/Linux/harness-instructions/   SKILL.md for AI agent harnesses
+Cowork/Linux/                             Cowork fixes (coming later)
+```
+
+Cowork, Claude Desktop's workspace feature, has its own separate issues (QEMU setup, the `installSdk` timeout). They are kept apart from the Claude Code fix and are not handled by the script below.
+
 ## What it fixes
 
 | # | Target | What the script does |
 |---|--------|----------------------|
 | 1 | **Claude Code CLI**: npm install and the native installer | Wraps the binary with SDE |
-| 2 | **Claude Desktop**: embedded CLI and Cowork | Wraps the embedded CLI and raises Cowork's 30 s `installSdk` timeout to 900 s (needs `sudo`) |
+| 2 | **Claude Desktop**: embedded Claude Code CLI | Wraps the embedded CLI |
 | 3 | **VS Code extension**, also Insiders, VSCodium, Cursor, Windsurf and Flatpak builds | Wraps the bundled binary and raises the 60 s startup timeout to 900 s |
 | 4 | **Zed Claude Agent** (ACP) | Wraps the agent binary |
 | 5 | **Droid** (Factory AI CLI) | Wraps the binary |
@@ -41,7 +51,7 @@ Emulation is **slow**: even `claude --version` can take about a minute. The IDE 
 ## Requirements
 
 - Linux on x86-64
-- `bash`, plus `python3` for the Cowork patch
+- `bash`
 - **Intel SDE.** If it's missing, the script offers to install it:
   - on Arch-based distros, through the AUR (`paru -S intel-sde` or `yay -S intel-sde`)
   - elsewhere, by downloading Intel's Linux tarball into `~/.local/opt/intel-sde` (needs `curl` or `wget`, and `tar` with `xz` support)
@@ -53,12 +63,12 @@ Emulation is **slow**: even `claude --version` can take about a minute. The IDE 
 
 ```bash
 git clone https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix.git
-cd claude-code-sigill-fix/Linux/fix
+cd claude-code-sigill-fix/Claude-Code/Linux/fix
 chmod +x claude-sigill-fix.sh
 ./claude-sigill-fix.sh
 ```
 
-The commands below assume you are in `Linux/fix`.
+The commands below assume you are in `Claude-Code/Linux/fix`.
 
 The script asks which targets to fix. Type the numbers separated by spaces and press Enter:
 
@@ -87,7 +97,7 @@ For unattended runs (cron, systemd timers, AI agents):
 ./claude-sigill-fix.sh --no-sudo --install-sde 6 </dev/null
 ```
 
-- `--no-sudo` never calls `sudo`, so the Cowork patch is skipped.
+- `--no-sudo` never calls `sudo`, so SDE is never installed from the AUR.
 - `--install-sde` installs SDE without asking if it is missing. Together with `--no-sudo`, it downloads SDE into `~/.local/opt/intel-sde`.
 - The exit code is `1` if any step failed.
 
@@ -95,7 +105,7 @@ After patching, **fully close and reopen** VS Code, Zed or Claude Desktop.
 
 ## Using it from an AI agent (Hermes and others)
 
-[`Linux/harness-instructions/SKILL.md`](Linux/harness-instructions/SKILL.md) is a ready-made skill. With it, an agent harness such as Hermes Agent can:
+[`Claude-Code/Linux/harness-instructions/SKILL.md`](Claude-Code/Linux/harness-instructions/SKILL.md) is a ready-made skill. With it, an agent harness such as Hermes Agent can:
 
 - detect the problem
 - apply the fix without `sudo`
@@ -147,13 +157,12 @@ The native installer runs the freshly downloaded binary as part of installing. O
 ./claude-sigill-fix.sh --restore 1 3    # only the CLI and VS Code
 ```
 
-This puts the original binaries back, resets the timeouts to their defaults and restores `cowork-linux-helper` from the backup the script made.
+This puts the original binaries back, and resets the timeouts to their defaults.
 
 ## Troubleshooting
 
 - **`Subprocess initialization did not complete within 60000ms` in VS Code.** The extension was updated. Re-run the script and restart VS Code.
 - **`Illegal instruction` again.** Something was updated. Re-run the script.
-- **Cowork: `request req-2 (installSdk) timed out after 30s`.** Run option 2. Claude Desktop installed as an AppImage can't be patched in place; its image must be extracted and rebuilt.
 - **Flatpak editors.** A Flatpak sandbox can't see `/usr/bin/intel-sde`. Install SDE into `~/.local/opt/intel-sde` instead: remove the system package, or just download Intel's tarball there.
 - **`timeout setting not found in extension.js`.** The extension's code changed and the script no longer recognizes the timeout. Please open an issue.
 

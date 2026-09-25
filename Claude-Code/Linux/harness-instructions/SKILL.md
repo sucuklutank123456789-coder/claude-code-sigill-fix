@@ -1,6 +1,6 @@
 ---
 name: claude-sigill-fix
-description: Keep Claude Code (CLI, Claude Desktop, VS Code / Cursor / Windsurf extension, Zed agent) and Droid running on Linux machines whose CPU lacks AVX/AVX2/SSE4.2, where they crash with "Illegal instruction" (SIGILL). Use when one of them fails to start with SIGILL or "Illegal instruction (core dumped)", after any of them was updated, or when asked to update Claude Code on such a machine.
+description: Keep Claude Code (CLI, Claude Desktop's embedded CLI, VS Code / Cursor / Windsurf extension, Zed agent) and Droid running on Linux machines whose CPU lacks AVX/AVX2/SSE4.2, where they crash with "Illegal instruction" (SIGILL). Use when one of them fails to start with SIGILL or "Illegal instruction (core dumped)", after any of them was updated, or when asked to update Claude Code on such a machine.
 ---
 
 # Claude Code SIGILL fix (Linux, no-AVX CPUs)
@@ -26,10 +26,7 @@ mkdir -p ~/.hermes/skills/claude-sigill-fix
 cp SKILL.md ~/.hermes/skills/claude-sigill-fix/SKILL.md
 ```
 
-Nothing below needs `sudo`, except two optional steps that the agent leaves to you:
-
-- installing Intel SDE as a system package
-- the Claude Desktop Cowork timeout patch
+Nothing below needs `sudo`, except installing Intel SDE as a system package. That step is optional and the agent leaves it to you.
 
 ---
 
@@ -45,7 +42,7 @@ Every update of Claude Code, the editor extensions, Zed's agent, Claude Desktop 
 
 - **Never use `sudo`** and never ask for the user's password. If a step needs root, stop and give the user the exact command to run themselves.
 - **Always run the script non-interactively.** Pass the target numbers as arguments, add `--no-sudo`, and redirect stdin from `/dev/null` so no prompt can block you.
-- **Do not edit, move or delete the patched files by hand.** Leave the `*.realbinary` files, the wrapper scripts, `extension.js` and `cowork-linux-helper*` to the script.
+- **Do not edit, move or delete the patched files by hand.** Leave the `*.realbinary` files, the wrapper scripts, and `extension.js` to the script.
 - **Never run `claude update`.** It does not work on these machines. See "Updating Claude Code" below.
 - **Do not run `--restore` unless the user asks for it.**
 - **Do not close or kill the user's editors or apps.** After patching, tell the user which apps to fully restart.
@@ -67,7 +64,7 @@ if [ -d "$REPO/.git" ]; then
 else
     git clone https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix.git "$REPO"
 fi
-FIX="$REPO/Linux/fix/claude-sigill-fix.sh"
+FIX="$REPO/Claude-Code/Linux/fix/claude-sigill-fix.sh"
 ```
 
 ### Step 3: make sure Intel SDE is available
@@ -112,14 +109,9 @@ Use `6` unless the user asked for specific targets.
 - **Status lines:**
   - `[OK]`: already patched.
   - `[PATCHED]`: fixed now. Tell the user to fully restart that app.
-  - `[SKIP]`: not installed, or skipped because of `--no-sudo`.
+  - `[SKIP]`: not installed.
   - `[ERROR]`: report the line to the user verbatim.
 - **`timeout setting not found in ... extension.js`:** the extension changed in a way the script doesn't recognize. Tell the user; do not patch the file yourself.
-- **Cowork line:** if the output shows `cowork-linux-helper needs sudo, skipped` and the user uses Claude Desktop's Cowork feature, tell them to run this once themselves:
-
-  ```bash
-  ~/.local/share/claude-code-sigill-fix/Linux/fix/claude-sigill-fix.sh 2
-  ```
 
 ### Updating Claude Code
 
@@ -163,7 +155,7 @@ Because every update undoes the fix, re-run step 4 on a schedule. Pick one of th
 **A) The harness's own scheduler** (for example a Hermes cron job). Run this once a day and after every update you perform:
 
 ```bash
-bash "$HOME/.local/share/claude-code-sigill-fix/Linux/fix/claude-sigill-fix.sh" --no-sudo 6 </dev/null
+bash "$HOME/.local/share/claude-code-sigill-fix/Claude-Code/Linux/fix/claude-sigill-fix.sh" --no-sudo 6 </dev/null
 ```
 
 Only notify the user when the output contains `[PATCHED]` or `[ERROR]`.
@@ -179,7 +171,7 @@ Description=Re-apply the Claude Code SIGILL fix
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/env bash %h/.local/share/claude-code-sigill-fix/Linux/fix/claude-sigill-fix.sh --no-sudo 6
+ExecStart=/usr/bin/env bash %h/.local/share/claude-code-sigill-fix/Claude-Code/Linux/fix/claude-sigill-fix.sh --no-sudo 6
 StandardInput=null
 EOF
 
@@ -218,8 +210,4 @@ rm ~/.config/systemd/user/claude-sigill-fix.{service,timer}
 bash "$FIX" --no-sudo --restore 6 </dev/null
 ```
 
-This restores every original binary and timeout except the Cowork helper. For that one, the user runs the following themselves, since it needs sudo:
-
-```bash
-~/.local/share/claude-code-sigill-fix/Linux/fix/claude-sigill-fix.sh --restore 2
-```
+This restores every original binary and timeout.

@@ -20,14 +20,14 @@
 #   ./claude-sigill-fix.sh --restore    undo the fixes (menu or numbers too)
 #
 # Options for unattended use (agents, cron, systemd timers):
-#   --no-sudo       never call sudo (skips the Cowork helper patch)
+#   --no-sudo       never call sudo (SDE is then never installed from the AUR)
 #   --install-sde   install Intel SDE without asking if it is missing
 #                   (with --no-sudo it downloads into ~/.local/opt/intel-sde)
 #   Exit code is 1 if any step failed, 0 otherwise.
 #
 # Targets:
 #   1. Terminal CLI (npm global install and the native installer)
-#   2. Claude Desktop (embedded CLI + Cowork installSdk timeout, needs sudo)
+#   2. Claude Desktop (embedded Claude Code CLI; Cowork is not covered here)
 #   3. VS Code extension (also Insiders, VSCodium, Cursor, Windsurf, Flatpak)
 #   4. Zed Claude Agent (ACP)
 #   5. Droid (Factory AI CLI)
@@ -259,11 +259,6 @@ wrap_found() {
     [[ "$found" -eq 1 ]] || skip "$1"
 }
 
-# Copies a file into a root-owned location with sudo.
-sudo_install() {
-    sudo cp "$1" "$2" && sudo chown root:root "$2" && sudo chmod 755 "$2"
-}
-
 # --- 1) Terminal CLI ---------------------------------------------------------
 fix_cli() {
     header "Terminal CLI"
@@ -293,78 +288,9 @@ fix_cli() {
 # --- 2) Claude Desktop -------------------------------------------------------
 fix_desktop() {
     header "Claude Desktop embedded CLI"
-    find "$HOME/.config/Claude/claude-code" "$HOME/.config/Claude/claude-code-vm" -maxdepth 2 \
+    find "$HOME/.config/Claude/claude-code" -maxdepth 2 \
          \( -name 'claude' -o -name 'claude.realbinary' \) 2>/dev/null \
         | wrap_found "Desktop embedded CLI not found"
-
-    header "Claude Desktop Cowork installSdk timeout (cowork-linux-helper)"
-    local HELPER="" h COUNT TMP
-    for h in /usr/lib/claude-desktop/resources/cowork-linux-helper \
-             /opt/claude-desktop/resources/cowork-linux-helper; do
-        [[ -f "$h" ]] && { HELPER="$h"; break; }
-    done
-
-    if [[ -z "$HELPER" ]]; then
-        skip "cowork-linux-helper not found (AppImage installs need a manual rebuild)"
-        return
-    fi
-    if [[ "$NO_SUDO" -eq 1 ]]; then
-        skip "cowork-linux-helper needs sudo, skipped because of --no-sudo"
-        return
-    fi
-
-    if [[ "$MODE" == "restore" ]]; then
-        if [[ -f "$HELPER.orig.bak" ]]; then
-            if sudo_install "$HELPER.orig.bak" "$HELPER"; then
-                sudo rm -f "$HELPER.orig.bak"
-                restored "cowork-linux-helper restored from backup"
-            else
-                fail "could not restore cowork-linux-helper"
-            fi
-        else
-            ok "cowork-linux-helper has no backup, nothing to restore"
-        fi
-        return
-    fi
-
-    if ! command -v python3 >/dev/null 2>&1; then
-        fail "python3 is required for the Cowork patch"
-        return
-    fi
-
-    COUNT="$(python3 - "$HELPER" <<'PYEOF'
-import struct, sys
-try:
-    d = open(sys.argv[1], "rb").read()
-except Exception:
-    print("ERR"); sys.exit(0)
-print(d.count(struct.pack("<Q", 30_000_000_000)))
-PYEOF
-)"
-    if [[ "$COUNT" == "0" ]]; then
-        ok "cowork-linux-helper already patched"
-    elif [[ "$COUNT" == "ERR" ]]; then
-        fail "could not read cowork-linux-helper"
-    else
-        echo "  ${YELLOW}found $COUNT x 30s constant, sudo needed to patch${RESET}"
-        TMP="$(mktemp)"
-        cp "$HELPER" "$TMP"
-        python3 - "$TMP" <<'PYEOF'
-import struct, sys
-p = sys.argv[1]
-d = bytearray(open(p, "rb").read())
-d = d.replace(struct.pack("<Q", 30_000_000_000), struct.pack("<Q", 900_000_000_000))
-open(p, "wb").write(d)
-PYEOF
-        # The file is unpatched right now, so this backup always matches the
-        # currently installed version (an app update replaces the old one).
-        if sudo cp "$HELPER" "$HELPER.orig.bak" && sudo_install "$TMP" "$HELPER"; then
-            patched "cowork-linux-helper 30s -> 900s"
-        else
-            fail "could not copy patched cowork-linux-helper into place"
-        fi
-        rm -f "$TMP"
-    fi
 }
 
 # --- 3) VS Code extension ----------------------------------------------------
