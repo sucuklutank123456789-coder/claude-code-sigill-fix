@@ -1,8 +1,13 @@
 # claude-code-sigill-fix
 
-Run Claude Code on old x86-64 CPUs that lack **AVX / AVX2 / SSE4.2** (Core 2 Duo, early Core i / Phenom and similar) on Linux.
+Run Claude Code on Linux on x86-64 CPUs that lack **AVX2**. This includes older CPUs without any AVX or SSE4.2 (Core 2 Duo, first-generation Core i, Phenom and similar), and CPUs that have AVX but no AVX2 (Sandy Bridge and Ivy Bridge).
 
-Since v2.1.113, Claude Code ships as a native binary built with instructions these CPUs don't have. On such a machine every Claude Code surface dies immediately with:
+Claude Code's native binaries are built with instructions these CPUs don't have:
+
+- **Native installer:** the standalone binary broke first, in v2.1.15, which moved to Bun 1.3.6 ([anthropics/claude-code#20116](https://github.com/anthropics/claude-code/issues/20116)).
+- **npm package:** it stayed pure JavaScript up to v2.1.112. Since v2.1.113 it also ships a native binary.
+
+On such a machine every Claude Code surface dies immediately with:
 
 ```
 Illegal instruction (core dumped)
@@ -13,6 +18,27 @@ That crash is a `SIGILL`. The Claude Code fix script works around it by running 
 > **Not an official Anthropic tool.** It modifies installed files of Claude Code and related apps. Use at your own risk.
 
 > ⚠️ **Expect Claude Code to run much slower than normal.** Every instruction the CPU lacks is emulated in software, so startup can take about a minute (even `claude --version`), and commands, tool calls and the IDE integrations respond noticeably slower than on a modern CPU. This fix makes Claude Code *work* on old hardware; it cannot make it fast.
+
+## Am I affected?
+
+```bash
+grep -qw avx2 /proc/cpuinfo && echo "has AVX2: fix NOT needed" || echo "no AVX2: fix needed"
+```
+
+If your CPU has AVX2, this fix is not for you: a `SIGILL` there has a different cause.
+
+The check is for AVX2, so CPUs that have AVX but no AVX2 (Sandy Bridge and Ivy Bridge) are covered too.
+
+### Running Claude Code in a virtual machine?
+
+Try this first. A physical CPU with AVX2 can still look like it lacks AVX2 inside a VM. Proxmox, VMware, VirtualBox and other hypervisors often give guests a generic virtual CPU model without AVX, which causes exactly this crash ([anthropics/claude-code#20019](https://github.com/anthropics/claude-code/issues/20019)).
+
+**The real fix is to set the VM's CPU type to `host`** (host passthrough), so the guest sees every instruction the physical CPU has. For example:
+
+- **Proxmox:** Hardware → Processors → Type: `host`
+- **libvirt / virt-manager:** CPU model `host-passthrough`
+
+Claude Code then runs natively at full speed. Only use the SDE workaround in this repository if the host CPU itself has no AVX2, or if you can't change the VM's CPU type.
 
 ## Repository layout
 
@@ -195,11 +221,34 @@ chmod +x cowork-fix.sh
 - **AI agents:** [`Cowork/Linux/harness/SKILL.md`](Cowork/Linux/harness/SKILL.md) is the matching skill. The agent runs the script without `sudo` and hands the root commands to you.
 - **Tested on:** Arch-based systems only (Garuda). The apt, dnf and zypper package names and firmware paths are best guesses and are untested. Reports are welcome.
 
+## Related issues
+
+AVX-related crash reports in [anthropics/claude-code](https://github.com/anthropics/claude-code):
+
+- [#20116](https://github.com/anthropics/claude-code/issues/20116): the native installer's binary breaks on CPUs without AVX since v2.1.15 (Bun 1.3.6)
+- [#20019](https://github.com/anthropics/claude-code/issues/20019): the same crash inside VMs whose virtual CPU type has no AVX
+- [#24562](https://github.com/anthropics/claude-code/issues/24562)
+- [#37919](https://github.com/anthropics/claude-code/issues/37919)
+- [#10408](https://github.com/anthropics/claude-code/issues/10408)
+
+Reports of `SIGILL` on CPUs that *do* have AVX2 have a different cause. This repository does not help with those.
+
 ## Tested on
 
 - Intel Core 2 Duo E8400, Garuda Linux (Arch-based)
 
 Other distributions should work the same way but have not been tested yet. Reports are welcome.
+
+## Versions
+
+Releases are tagged `vX.Y.Z`; see [CHANGELOG.md](CHANGELOG.md). To stay on the latest release instead of the tip of `main`:
+
+```bash
+git fetch --tags
+git checkout "$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
+```
+
+`./claude-code-fix.sh --version` and `./cowork-fix.sh --version` print the script version. Please include it in [bug reports](https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix/issues/new?template=bug_report.yml).
 
 ## License
 
