@@ -1,5 +1,5 @@
 ---
-name: claude-sigill-fix
+name: claude-code-fix
 description: Keep Claude Code (CLI, Claude Desktop's embedded CLI, VS Code / Cursor / Windsurf extension, Zed agent) and Droid running on Linux machines whose CPU lacks AVX/AVX2/SSE4.2, where they crash with "Illegal instruction" (SIGILL). Use when one of them fails to start with SIGILL or "Illegal instruction (core dumped)", after any of them was updated, or when asked to update Claude Code on such a machine.
 ---
 
@@ -9,7 +9,7 @@ description: Keep Claude Code (CLI, Claude Desktop's embedded CLI, VS Code / Cur
 
 This file is a ready-made skill in the common `SKILL.md` format (YAML frontmatter plus Markdown instructions). Hermes Agent, Claude Code and most other agent harnesses that support skills can load it.
 
-1. Create a folder named `claude-sigill-fix` in your harness's skills directory.
+1. Create a folder named `claude-code-fix` in your harness's skills directory.
 2. Copy this file into it as `SKILL.md`.
 3. Restart the agent, or reload its skills.
 
@@ -22,11 +22,13 @@ This file is a ready-made skill in the common `SKILL.md` format (YAML frontmatte
 For example:
 
 ```bash
-mkdir -p ~/.hermes/skills/claude-sigill-fix
-cp SKILL.md ~/.hermes/skills/claude-sigill-fix/SKILL.md
+mkdir -p ~/.hermes/skills/claude-code-fix
+cp SKILL.md ~/.hermes/skills/claude-code-fix/SKILL.md
 ```
 
 Nothing below needs `sudo`, except installing Intel SDE as a system package. That step is optional and the agent leaves it to you.
+
+This skill does not cover Claude Desktop's Cowork feature. For Cowork, use `Cowork/Linux/harness/SKILL.md` from the same repository.
 
 ---
 
@@ -64,7 +66,7 @@ if [ -d "$REPO/.git" ]; then
 else
     git clone https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix.git "$REPO"
 fi
-FIX="$REPO/Claude-Code/Linux/fix/claude-sigill-fix.sh"
+FIX="$REPO/Claude-Code/Linux/fix/claude-code-fix.sh"
 ```
 
 ### Step 3: make sure Intel SDE is available
@@ -155,7 +157,7 @@ Because every update undoes the fix, re-run step 4 on a schedule. Pick one of th
 **A) The harness's own scheduler** (for example a Hermes cron job). Run this once a day and after every update you perform:
 
 ```bash
-bash "$HOME/.local/share/claude-code-sigill-fix/Claude-Code/Linux/fix/claude-sigill-fix.sh" --no-sudo 6 </dev/null
+bash "$HOME/.local/share/claude-code-sigill-fix/Claude-Code/Linux/fix/claude-code-fix.sh" --no-sudo 6 </dev/null
 ```
 
 Only notify the user when the output contains `[PATCHED]` or `[ERROR]`.
@@ -165,17 +167,17 @@ Only notify the user when the output contains `[PATCHED]` or `[ERROR]`.
 ```bash
 mkdir -p ~/.config/systemd/user
 
-cat > ~/.config/systemd/user/claude-sigill-fix.service <<'EOF'
+cat > ~/.config/systemd/user/claude-code-fix.service <<'EOF'
 [Unit]
 Description=Re-apply the Claude Code SIGILL fix
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/env bash %h/.local/share/claude-code-sigill-fix/Claude-Code/Linux/fix/claude-sigill-fix.sh --no-sudo 6
+ExecStart=/usr/bin/env bash %h/.local/share/claude-code-sigill-fix/Claude-Code/Linux/fix/claude-code-fix.sh --no-sudo 6
 StandardInput=null
 EOF
 
-cat > ~/.config/systemd/user/claude-sigill-fix.timer <<'EOF'
+cat > ~/.config/systemd/user/claude-code-fix.timer <<'EOF'
 [Unit]
 Description=Re-apply the Claude Code SIGILL fix periodically
 
@@ -188,20 +190,20 @@ WantedBy=timers.target
 EOF
 
 systemctl --user daemon-reload
-systemctl --user enable --now claude-sigill-fix.timer
+systemctl --user enable --now claude-code-fix.timer
 ```
 
 Check the results with:
 
 ```bash
-journalctl --user -u claude-sigill-fix.service -n 50
+journalctl --user -u claude-code-fix.service -n 50
 ```
 
 To remove the timer:
 
 ```bash
-systemctl --user disable --now claude-sigill-fix.timer
-rm ~/.config/systemd/user/claude-sigill-fix.{service,timer}
+systemctl --user disable --now claude-code-fix.timer
+rm ~/.config/systemd/user/claude-code-fix.{service,timer}
 ```
 
 ### Undoing the fix (only when the user asks)

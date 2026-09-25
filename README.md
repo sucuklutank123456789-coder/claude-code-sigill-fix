@@ -8,7 +8,7 @@ Since v2.1.113, Claude Code ships as a native binary built with instructions the
 Illegal instruction (core dumped)
 ```
 
-That crash is a `SIGILL`. This script works around it by running those binaries under [Intel SDE](https://www.intel.com/content/www/us/en/download/684897/intel-software-development-emulator.html), which emulates the missing instructions in software.
+That crash is a `SIGILL`. The Claude Code fix script works around it by running those binaries under [Intel SDE](https://www.intel.com/content/www/us/en/download/684897/intel-software-development-emulator.html), which emulates the missing instructions in software.
 
 > **Not an official Anthropic tool.** It modifies installed files of Claude Code and related apps. Use at your own risk.
 
@@ -17,9 +17,10 @@ That crash is a `SIGILL`. This script works around it by running those binaries 
 ## Repository layout
 
 ```
-Claude-Code/Linux/fix/                    the fix script
-Claude-Code/Linux/harness-instructions/   SKILL.md for AI agent harnesses
-Cowork/Linux/fix/                         the Cowork fix script
+Claude-Code/Linux/fix/       claude-code-fix.sh   Claude Code SIGILL fix
+Claude-Code/Linux/harness/   SKILL.md             skill for AI agent harnesses
+Cowork/Linux/fix/            cowork-fix.sh        Cowork fix
+Cowork/Linux/harness/        SKILL.md             skill for AI agent harnesses
 ```
 
 Cowork, Claude Desktop's workspace feature, has its own separate issues. They are handled by a separate script, see [Cowork](#cowork) below. The Claude Code script does not touch Cowork.
@@ -64,8 +65,8 @@ Emulation is **slow**: even `claude --version` can take about a minute. The IDE 
 ```bash
 git clone https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix.git
 cd claude-code-sigill-fix/Claude-Code/Linux/fix
-chmod +x claude-sigill-fix.sh
-./claude-sigill-fix.sh
+chmod +x claude-code-fix.sh
+./claude-code-fix.sh
 ```
 
 The commands below assume you are in `Claude-Code/Linux/fix`.
@@ -75,7 +76,7 @@ The script asks which targets to fix. Type the numbers separated by spaces and p
 ```
 Which one do you want to fix?
   1: Claude Code CLI (terminal)
-  2: Claude Desktop app
+  2: Claude Desktop (embedded Claude Code CLI)
   3: VS Code extension (also Cursor, Windsurf, VSCodium)
   4: Zed Claude Agent (ACP)
   5: Droid (Factory AI CLI)
@@ -86,15 +87,15 @@ Enter numbers separated by spaces (e.g. 4 1):
 You can also skip the menu:
 
 ```bash
-./claude-sigill-fix.sh 4 1        # fix Zed and the CLI
-./claude-sigill-fix.sh 6          # fix everything
-./claude-sigill-fix.sh --help
+./claude-code-fix.sh 4 1        # fix Zed and the CLI
+./claude-code-fix.sh 6          # fix everything
+./claude-code-fix.sh --help
 ```
 
 For unattended runs (cron, systemd timers, AI agents):
 
 ```bash
-./claude-sigill-fix.sh --no-sudo --install-sde 6 </dev/null
+./claude-code-fix.sh --no-sudo --install-sde 6 </dev/null
 ```
 
 - `--no-sudo` never calls `sudo`, so SDE is never installed from the AUR.
@@ -103,9 +104,13 @@ For unattended runs (cron, systemd timers, AI agents):
 
 After patching, **fully close and reopen** VS Code, Zed or Claude Desktop.
 
+The script is safe to re-run. It only touches what is not patched yet, and reports every step as `[OK]`, `[PATCHED]`, `[SKIP]` or `[ERROR]`.
+
+If your CPU does support AVX2, the script warns you and stops unless you confirm. On such a CPU Claude Code runs natively, and wrapping it would only make it much slower.
+
 ## Using it from an AI agent (Hermes and others)
 
-[`Claude-Code/Linux/harness-instructions/SKILL.md`](Claude-Code/Linux/harness-instructions/SKILL.md) is a ready-made skill. With it, an agent harness such as Hermes Agent can:
+[`Claude-Code/Linux/harness/SKILL.md`](Claude-Code/Linux/harness/SKILL.md) is a ready-made skill. With it, an agent harness such as Hermes Agent can:
 
 - detect the problem
 - apply the fix without `sudo`
@@ -114,10 +119,6 @@ After patching, **fully close and reopen** VS Code, Zed or Claude Desktop.
 
 The file also explains how to install it as a skill.
 
-The script is safe to re-run. It only touches what is not patched yet, and reports every step as `[OK]`, `[PATCHED]`, `[SKIP]` or `[ERROR]`.
-
-If your CPU does support AVX2, the script warns you and stops unless you confirm. On such a CPU Claude Code runs natively, and wrapping it would only make it much slower.
-
 ## ⚠️ Re-run the script after every update
 
 Every update replaces the patched files with fresh native binaries, which crash with `SIGILL` again. This happens for Claude Code itself, the VS Code extension, Zed's agent, Claude Desktop and Droid.
@@ -125,7 +126,7 @@ Every update replaces the patched files with fresh native binaries, which crash 
 **Whenever something is updated, run the script again:**
 
 ```bash
-./claude-sigill-fix.sh
+./claude-code-fix.sh
 ```
 
 ## ⚠️ Updating the Claude Code CLI
@@ -136,7 +137,7 @@ Every update replaces the patched files with fresh native binaries, which crash 
 
 ```bash
 npm install -g --allow-scripts=@anthropic-ai/claude-code @anthropic-ai/claude-code@latest
-./claude-sigill-fix.sh 1
+./claude-code-fix.sh 1
 ```
 
 Recent npm versions block install scripts by default. `--allow-scripts` lets the package fetch its native binary. If your npm doesn't know that flag, drop it.
@@ -145,7 +146,7 @@ Recent npm versions block install scripts by default. `--allow-scripts` lets the
 
 ```bash
 curl -fsSL https://claude.ai/install.sh | bash
-./claude-sigill-fix.sh 1
+./claude-code-fix.sh 1
 ```
 
 The native installer runs the freshly downloaded binary as part of installing. On these CPUs that step can itself crash with `SIGILL`. If it does, use the npm method instead.
@@ -153,11 +154,11 @@ The native installer runs the freshly downloaded binary as part of installing. O
 ## Undoing the fix
 
 ```bash
-./claude-sigill-fix.sh --restore        # menu
-./claude-sigill-fix.sh --restore 1 3    # only the CLI and VS Code
+./claude-code-fix.sh --restore        # menu
+./claude-code-fix.sh --restore 1 3    # only the CLI and VS Code
 ```
 
-This puts the original binaries back, and resets the timeouts to their defaults.
+This puts the original binaries back and resets the timeouts to their defaults.
 
 ## Troubleshooting
 
@@ -191,6 +192,7 @@ chmod +x cowork-fix.sh
 - **Target 2** needs Intel SDE. The Claude Code script can install it with `--install-sde`.
 - **AppImage installs:** The timeout patch doesn't work on the AppImage version of Claude Desktop. The image would have to be extracted and rebuilt by hand.
 - **Updates:** Re-run the script after Claude Desktop updates. An update restores the original `cowork-linux-helper` and brings a new VM CLI.
+- **AI agents:** [`Cowork/Linux/harness/SKILL.md`](Cowork/Linux/harness/SKILL.md) is the matching skill. The agent runs the script without `sudo` and hands the root commands to you.
 - **Tested on:** Arch-based systems only (Garuda). The apt, dnf and zypper package names and firmware paths are best guesses and are untested. Reports are welcome.
 
 ## Tested on

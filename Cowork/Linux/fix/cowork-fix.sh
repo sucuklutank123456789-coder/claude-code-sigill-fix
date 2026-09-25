@@ -291,7 +291,7 @@ fix_vm_cli() {
         SDE="$(command -v intel-sde || command -v sde64 || command -v sde \
                || { [[ -x "$SDE_HOME/sde64" ]] && echo "$SDE_HOME/sde64"; } || true)"
         if [[ -z "$SDE" ]]; then
-            fail "Intel SDE not found; install it with Claude-Code/Linux/fix/claude-sigill-fix.sh --install-sde"
+            fail "Intel SDE not found; install it with Claude-Code/Linux/fix/claude-code-fix.sh --install-sde"
             return
         fi
     fi

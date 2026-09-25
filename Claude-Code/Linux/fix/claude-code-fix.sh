@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-sigill-fix.sh
+# claude-code-fix.sh
 #
 # Makes Claude Code run on legacy x86-64 CPUs without AVX/AVX2/SSE4.2
 # (e.g. Core 2 Duo) on Linux, where native binaries crash with
@@ -15,9 +15,9 @@
 # systems, otherwise the Linux tarball from Intel into ~/.local/opt/intel-sde).
 #
 # Usage:
-#   ./claude-sigill-fix.sh              interactive menu
-#   ./claude-sigill-fix.sh 4 1          fix targets 4 and 1 without the menu
-#   ./claude-sigill-fix.sh --restore    undo the fixes (menu or numbers too)
+#   ./claude-code-fix.sh              interactive menu
+#   ./claude-code-fix.sh 4 1          fix targets 4 and 1 without the menu
+#   ./claude-code-fix.sh --restore    undo the fixes (menu or numbers too)
 #
 # Options for unattended use (agents, cron, systemd timers):
 #   --no-sudo       never call sudo (SDE is then never installed from the AUR)
@@ -108,7 +108,7 @@ if [[ ${#NUMS[@]} -gt 0 ]]; then
 else
     [[ "$MODE" == "fix" ]] && echo "Which one do you want to fix?" || echo "Which one do you want to restore?"
     echo "  1: Claude Code CLI (terminal)"
-    echo "  2: Claude Desktop app"
+    echo "  2: Claude Desktop (embedded Claude Code CLI)"
     echo "  3: VS Code extension (also Cursor, Windsurf, VSCodium)"
     echo "  4: Zed Claude Agent (ACP)"
     echo "  5: Droid (Factory AI CLI)"
