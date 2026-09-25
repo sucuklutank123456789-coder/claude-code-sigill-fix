@@ -19,10 +19,10 @@ That crash is a `SIGILL`. This script works around it by running those binaries 
 ```
 Claude-Code/Linux/fix/                    the fix script
 Claude-Code/Linux/harness-instructions/   SKILL.md for AI agent harnesses
-Cowork/Linux/                             Cowork fixes (coming later)
+Cowork/Linux/fix/                         the Cowork fix script
 ```
 
-Cowork, Claude Desktop's workspace feature, has its own separate issues (QEMU setup, the `installSdk` timeout). They are kept apart from the Claude Code fix and are not handled by the script below.
+Cowork, Claude Desktop's workspace feature, has its own separate issues. They are handled by a separate script, see [Cowork](#cowork) below. The Claude Code script does not touch Cowork.
 
 ## What it fixes
 
@@ -165,6 +165,33 @@ This puts the original binaries back, and resets the timeouts to their defaults.
 - **`Illegal instruction` again.** Something was updated. Re-run the script.
 - **Flatpak editors.** A Flatpak sandbox can't see `/usr/bin/intel-sde`. Install SDE into `~/.local/opt/intel-sde` instead: remove the system package, or just download Intel's tarball there.
 - **`timeout setting not found in extension.js`.** The extension's code changed and the script no longer recognizes the timeout. Please open an issue.
+
+## Cowork
+
+`Cowork/Linux/fix/cowork-fix.sh` fixes the problems that keep Claude Desktop's Cowork feature from starting on Linux:
+
+| # | Problem | What the script does |
+|---|---------|----------------------|
+| 1 | **"Cowork requires QEMU"** | Installs QEMU, OVMF (UEFI firmware) and virtiofsd with your package manager (pacman, apt, dnf or zypper). Symlinks them to the Debian-style paths Claude Desktop looks for (`/usr/share/OVMF/OVMF_CODE_4M.fd`, `OVMF_VARS_4M.fd`, `/usr/libexec/virtiofsd`). Adds you to the `kvm` group. |
+| 2 | **Cowork VM CLI crashes with `SIGILL`** (CPUs without AVX2 only) | Wraps `~/.config/Claude/claude-code-vm/<version>/claude` with Intel SDE |
+| 3 | **`request req-2 (installSdk) timed out after 30s`** on slow machines | Raises the 30 s timeout compiled into `cowork-linux-helper` to 900 s (keeps a `.orig.bak` backup) |
+| 4 | All of the above | |
+
+```bash
+cd claude-code-sigill-fix/Cowork/Linux/fix
+chmod +x cowork-fix.sh
+./cowork-fix.sh             # menu
+./cowork-fix.sh 1 3         # run targets 1 and 3 without the menu
+./cowork-fix.sh --restore   # undo (installed packages stay)
+```
+
+- **sudo:** Steps 1 and 3 need root. The script shows every `sudo` command and asks before running it. Without a terminal it only prints the commands.
+- **Virtualization:** VT-x or AMD-V must be enabled in the BIOS.
+- **kvm group:** After being added to it, log out and back in (or reboot).
+- **Target 2** needs Intel SDE. The Claude Code script can install it with `--install-sde`.
+- **AppImage installs:** The timeout patch doesn't work on the AppImage version of Claude Desktop. The image would have to be extracted and rebuilt by hand.
+- **Updates:** Re-run the script after Claude Desktop updates. An update restores the original `cowork-linux-helper` and brings a new VM CLI.
+- **Tested on:** Arch-based systems only (Garuda). The apt, dnf and zypper package names and firmware paths are best guesses and are untested. Reports are welcome.
 
 ## Tested on
 
