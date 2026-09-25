@@ -1,0 +1,95 @@
+name: Bug report
+description: A fix script failed, or Claude Code / Cowork still does not work after running it.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please fill in every field; most problems depend on the exact CPU, distribution and install method.
+
+        Before reporting a `SIGILL` / `Illegal instruction` crash, run this and check the result:
+        ```bash
+        grep -qw avx2 /proc/cpuinfo && echo "has AVX2" || echo "no AVX2"
+        ```
+        If it prints `has AVX2`, this repository does not apply to your crash. If you are inside a virtual machine, first try setting the VM's CPU type to `host` (see the README).
+
+  - type: dropdown
+    id: script
+    attributes:
+      label: Which script?
+      options:
+        - claude-code-fix.sh (Claude Code)
+        - cowork-fix.sh (Cowork)
+        - Both
+    validations:
+      required: true
+
+  - type: input
+    id: script-version
+    attributes:
+      label: Script version
+      description: Output of `./claude-code-fix.sh --version` or `./cowork-fix.sh --version`.
+      placeholder: claude-code-fix.sh 1.0.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: lscpu
+    attributes:
+      label: lscpu output
+      description: Output of `lscpu`.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: distro
+    attributes:
+      label: Linux distribution
+      description: Output of `cat /etc/os-release`. Also mention whether this is a virtual machine (`systemd-detect-virt`).
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: claude-version
+    attributes:
+      label: Claude Code version
+      description: |
+        Output of `claude --version`. If it crashes, take the version from the file path instead, e.g. `~/.local/share/claude/versions/<version>` or the VS Code extension folder name.
+      placeholder: 2.1.240
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install-method
+    attributes:
+      label: Affected surfaces / install method
+      multiple: true
+      options:
+        - CLI installed with npm
+        - CLI installed with the native installer
+        - Claude Desktop (embedded CLI)
+        - Claude Desktop Cowork
+        - VS Code / VSCodium / Cursor / Windsurf extension
+        - Zed Claude Agent (ACP)
+        - Droid
+    validations:
+      required: true
+
+  - type: textarea
+    id: script-output
+    attributes:
+      label: Script output
+      description: The complete output of the script run, including the SUMMARY line.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead (error messages, which app, after which update).
+    validations:
+      required: true
