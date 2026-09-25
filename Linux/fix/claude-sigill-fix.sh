@@ -19,6 +19,12 @@
 #   ./claude-sigill-fix.sh 4 1          fix targets 4 and 1 without the menu
 #   ./claude-sigill-fix.sh --restore    undo the fixes (menu or numbers too)
 #
+# Options for unattended use (agents, cron, systemd timers):
+#   --no-sudo       never call sudo (skips the Cowork helper patch)
+#   --install-sde   install Intel SDE without asking if it is missing
+#                   (with --no-sudo it downloads into ~/.local/opt/intel-sde)
+#   Exit code is 1 if any step failed, 0 otherwise.
+#
 # Targets:
 #   1. Terminal CLI (npm global install and the native installer)
 #   2. Claude Desktop (embedded CLI + Cowork installSdk timeout, needs sudo)
@@ -50,14 +56,18 @@ skip()   { echo "  [SKIP]    $1"; }
 warn()   { echo "  ${YELLOW}[WARN]${RESET}    $1"; }
 fail()   { echo "  ${RED}[ERROR]${RESET}   $1"; FAILED=1; }
 
-usage() { sed -n '17,28p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '/^# Usage:/,/^#   6\./p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # --- Arguments ---------------------------------------------------------------
 MODE="fix"
+NO_SUDO=0
+AUTO_SDE=0
 NUMS=()
 for arg in "$@"; do
     case "$arg" in
-        --restore)  MODE="restore" ;;
+        --restore)      MODE="restore" ;;
+        --no-sudo)      NO_SUDO=1 ;;
+        --install-sde)  AUTO_SDE=1 ;;
         -h|--help)  usage; exit 0 ;;
         *)          NUMS+=("$arg") ;;
     esac
@@ -159,7 +169,8 @@ install_sde_generic() {
 install_sde() {
     local distro="" aur
     [[ -r /etc/os-release ]] && distro="$(. /etc/os-release; echo "${ID:-} ${ID_LIKE:-}")"
-    if [[ " $distro " == *" arch "* ]]; then
+    # The AUR build asks for sudo, so --no-sudo goes straight to Intel's tarball.
+    if [[ "$NO_SUDO" -eq 0 && " $distro " == *" arch "* ]]; then
         aur="$(command -v paru || command -v yay || true)"
         if [[ -n "$aur" ]]; then
             echo "Arch-based system detected, running: $(basename "$aur") -S intel-sde"
@@ -178,7 +189,11 @@ if [[ "$MODE" == "fix" ]]; then
         echo "${RED}Intel SDE not found.${RESET} The fix does not work without SDE."
         echo "SDE is Intel software under Intel's own license; installing it means you accept that license."
         ANSWER=""
-        [[ -t 0 ]] && read -r -p "Do you want to install SDE now? [y/N]: " ANSWER
+        if [[ "$AUTO_SDE" -eq 1 ]]; then
+            ANSWER="y"
+        elif [[ -t 0 ]]; then
+            read -r -p "Do you want to install SDE now? [y/N]: " ANSWER
+        fi
         if [[ "$ANSWER" =~ ^[Yy]$ ]] && install_sde; then
             SDE="$(find_sde)"
         fi
@@ -291,6 +306,10 @@ fix_desktop() {
 
     if [[ -z "$HELPER" ]]; then
         skip "cowork-linux-helper not found (AppImage installs need a manual rebuild)"
+        return
+    fi
+    if [[ "$NO_SUDO" -eq 1 ]]; then
+        skip "cowork-linux-helper needs sudo, skipped because of --no-sudo"
         return
     fi
 
@@ -443,4 +462,4 @@ else
     echo "${GREEN}Nothing to do.${RESET}"
 fi
 [[ "$FAILED" -eq 1 ]] && echo "${RED}Some steps failed, see the [ERROR] lines above.${RESET}"
-exit 0
+exit "$FAILED"

@@ -51,10 +51,12 @@ Emulation is **slow**: even `claude --version` can take about a minute. The IDE 
 
 ```bash
 git clone https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix.git
-cd claude-code-sigill-fix
+cd claude-code-sigill-fix/Linux/fix
 chmod +x claude-sigill-fix.sh
 ./claude-sigill-fix.sh
 ```
+
+The commands below assume you are in `Linux/fix`.
 
 The script asks which targets to fix. Type the numbers separated by spaces and press Enter:
 
@@ -77,7 +79,28 @@ You can also skip the menu:
 ./claude-sigill-fix.sh --help
 ```
 
+For unattended runs (cron, systemd timers, AI agents):
+
+```bash
+./claude-sigill-fix.sh --no-sudo --install-sde 6 </dev/null
+```
+
+- `--no-sudo` never calls `sudo`, so the Cowork patch is skipped.
+- `--install-sde` installs SDE without asking if it is missing. Together with `--no-sudo`, it downloads SDE into `~/.local/opt/intel-sde`.
+- The exit code is `1` if any step failed.
+
 After patching, **fully close and reopen** VS Code, Zed or Claude Desktop.
+
+## Using it from an AI agent (Hermes and others)
+
+[`Linux/harness-instructions/SKILL.md`](Linux/harness-instructions/SKILL.md) is a ready-made skill. With it, an agent harness such as Hermes Agent can:
+
+- detect the problem
+- apply the fix without `sudo`
+- update Claude Code the right way
+- re-apply the fix automatically after updates
+
+The file also explains how to install it as a skill.
 
 The script is safe to re-run. It only touches what is not patched yet, and reports every step as `[OK]`, `[PATCHED]`, `[SKIP]` or `[ERROR]`.
 
