@@ -1,6 +1,6 @@
 ---
 name: claude-code-fix
-description: Keep Claude Code (CLI, Claude Desktop's embedded CLI, VS Code / Cursor / Windsurf extension, Zed agent) and Droid running on Linux machines whose CPU lacks AVX/AVX2/SSE4.2, where they crash with "Illegal instruction" (SIGILL). Use when one of them fails to start with SIGILL or "Illegal instruction (core dumped)", after any of them was updated, or when asked to update Claude Code on such a machine.
+description: Keep Claude Code (CLI, Claude Desktop's embedded CLI, VS Code / Cursor / Windsurf extension, Zed agent) and Droid running on Linux machines whose CPU (or virtual CPU) lacks AVX2, where they crash with "Illegal instruction" (SIGILL). Use when one of them fails to start with SIGILL or "Illegal instruction (core dumped)", after any of them was updated, or when asked to update Claude Code on such a machine.
 ---
 
 # Claude Code SIGILL fix (Linux, no-AVX CPUs)
@@ -57,17 +57,31 @@ grep -qw avx2 /proc/cpuinfo && echo "has AVX2: fix NOT needed" || echo "no AVX2:
 
 If the CPU has AVX2, stop and tell the user this fix is not for their machine: the crash has another cause. The script would refuse anyway.
 
+If there is no AVX2, check whether this is a virtual machine:
+
+```bash
+systemd-detect-virt 2>/dev/null || echo none
+```
+
+Anything other than `none` means a VM. Hypervisors such as Proxmox and VMware often give guests a generic CPU model without AVX, even when the physical CPU has it. In that case, tell the user **first** to set the VM's CPU type to `host` (Proxmox: Hardware → Processors → Type `host`; libvirt: `host-passthrough`). This is a hypervisor setting you cannot change from inside the VM. After the change, Claude Code runs natively at full speed. Only continue with the steps below if the user says the host CPU itself lacks AVX2, or that they can't change the CPU type.
+
 ### Step 2: get or update the script (no sudo)
 
 ```bash
 REPO="$HOME/.local/share/claude-code-sigill-fix"
 if [ -d "$REPO/.git" ]; then
-    git -C "$REPO" pull --ff-only
+    git -C "$REPO" fetch --quiet --tags --force origin
 else
-    git clone https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix.git "$REPO"
+    git clone --quiet https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix.git "$REPO"
 fi
+# Use the newest release tag, not the tip of main (see CHANGELOG.md).
+TAG="$(git -C "$REPO" tag --list 'v*' --sort=-v:refname | head -n 1)"
+git -C "$REPO" -c advice.detachedHead=false checkout --quiet "${TAG:-origin/main}"
+echo "using ${TAG:-main (no release tag yet)}"
 FIX="$REPO/Claude-Code/Linux/fix/claude-code-fix.sh"
 ```
+
+The script is pinned to the newest release tag (`vX.Y.Z`). Only the step above moves it to a newer release: scheduled runs keep using the checked-out version until this step runs again. `bash "$FIX" --version` shows which version is in use.
 
 ### Step 3: make sure Intel SDE is available
 

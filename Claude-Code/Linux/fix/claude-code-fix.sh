@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # claude-code-fix.sh
 #
-# Makes Claude Code run on legacy x86-64 CPUs without AVX/AVX2/SSE4.2
-# (e.g. Core 2 Duo) on Linux, where native binaries crash with
+# Makes Claude Code run on x86-64 CPUs without AVX2 (e.g. Core 2 Duo, or
+# Sandy/Ivy Bridge, which have AVX but no AVX2)
+# on Linux, where native binaries crash with
 # "Illegal instruction (core dumped)" / SIGILL.
 #
 # How it works: every Claude Code native binary is renamed to
@@ -18,6 +19,7 @@
 #   ./claude-code-fix.sh              interactive menu
 #   ./claude-code-fix.sh 4 1          fix targets 4 and 1 without the menu
 #   ./claude-code-fix.sh --restore    undo the fixes (menu or numbers too)
+#   ./claude-code-fix.sh --version    print the script version
 #
 # Options for unattended use (agents, cron, systemd timers):
 #   --no-sudo       never call sudo (SDE is then never installed from the AUR)
@@ -56,7 +58,9 @@ skip()   { echo "  [SKIP]    $1"; }
 warn()   { echo "  ${YELLOW}[WARN]${RESET}    $1"; }
 fail()   { echo "  ${RED}[ERROR]${RESET}   $1"; FAILED=1; }
 
-usage() { sed -n '/^# Usage:/,/^#   6\./p' "$0" | sed 's/^# \{0,1\}//'; }
+VERSION="1.0.0"  # keep in sync with CHANGELOG.md
+
+usage() { echo "claude-code-fix.sh $VERSION"; echo; sed -n '/^# Usage:/,/^#   6\./p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # --- Arguments ---------------------------------------------------------------
 MODE="fix"
@@ -69,6 +73,7 @@ for arg in "$@"; do
         --no-sudo)      NO_SUDO=1 ;;
         --install-sde)  AUTO_SDE=1 ;;
         -h|--help)  usage; exit 0 ;;
+        --version)  echo "claude-code-fix.sh $VERSION"; exit 0 ;;
         *)          NUMS+=("$arg") ;;
     esac
 done
@@ -78,7 +83,7 @@ done
 # runs them natively, and wrapping them would only make them much slower.
 if [[ "$MODE" == "fix" ]] && grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
     echo "${YELLOW}Your CPU supports AVX2, so Claude Code should run natively.${RESET}"
-    echo "This fix is only for CPUs without AVX/AVX2/SSE4.2 and would make everything much slower."
+    echo "This fix is only for CPUs without AVX2 and would make everything much slower."
     ANSWER=""
     [[ -t 0 ]] && read -r -p "Continue anyway? [y/N]: " ANSWER
     [[ "$ANSWER" =~ ^[Yy]$ ]] || { echo "Nothing changed."; exit 0; }
@@ -168,6 +173,8 @@ install_sde_generic() {
 
 install_sde() {
     local distro="" aur
+    # os-release is read from the user's system at run time.
+    # shellcheck source=/dev/null
     [[ -r /etc/os-release ]] && distro="$(. /etc/os-release; echo "${ID:-} ${ID_LIKE:-}")"
     # The AUR build asks for sudo, so --no-sudo goes straight to Intel's tarball.
     if [[ "$NO_SUDO" -eq 0 && " $distro " == *" arch "* ]]; then
@@ -222,7 +229,11 @@ wrap() {
 
     if [[ "$MODE" == "restore" ]]; then
         if [[ -f "$real" ]]; then
-            mv -f "$real" "$target" && restored "unwrapped: $target" || fail "could not restore $target"
+            if mv -f "$real" "$target"; then
+                restored "unwrapped: $target"
+            else
+                fail "could not restore $target"
+            fi
         else
             ok "not wrapped: $target"
         fi
@@ -241,10 +252,12 @@ wrap() {
         return
     fi
 
-    printf '#!/usr/bin/env bash\nexec "%s" -hsw -- "%s" "$@"\n' "$SDE" "$real" > "$target" \
-        && chmod +x "$target" "$real" \
-        && patched "wrapped: $target" \
-        || fail "could not write wrapper: $target"
+    if printf '#!/usr/bin/env bash\nexec "%s" -hsw -- "%s" "$@"\n' "$SDE" "$real" > "$target" \
+        && chmod +x "$target" "$real"; then
+        patched "wrapped: $target"
+    else
+        fail "could not write wrapper: $target"
+    fi
 }
 
 # Wraps every path read from stdin (".realbinary" suffixes are stripped).
@@ -269,7 +282,7 @@ fix_cli() {
             npm_root="$(npm root -g 2>/dev/null)"
             for c in "$npm_root/@anthropic-ai/claude-code/bin/claude.exe" \
                      "$npm_root/@anthropic-ai/claude-code/bin/claude"; do
-                [[ -f "$c" || -f "$c.realbinary" ]] && echo "$c"
+                if is_elf "$c" || [[ -f "$c.realbinary" ]]; then echo "$c"; fi
             done
         fi
         # Native installer: every downloaded version, so auto-updates are covered too
@@ -304,8 +317,11 @@ patch_extension_js() {
 
     if grep -Eq "${TIMEOUT_RE}${from}([^0-9]|\$)" "$js"; then
         if sed -Ei "s/${TIMEOUT_RE}${from}([^0-9]|\$)/\\1${to}\\4/g" "$js"; then
-            [[ "$MODE" == "restore" ]] && restored "extension.js timeout -> 60000" \
-                                       || patched "extension.js startup timeout 60000 -> 900000"
+            if [[ "$MODE" == "restore" ]]; then
+                restored "extension.js timeout -> 60000"
+            else
+                patched "extension.js startup timeout 60000 -> 900000"
+            fi
         else
             fail "could not patch $js"
         fi
@@ -377,7 +393,7 @@ selected 5 && fix_droid
 
 # --- Summary -----------------------------------------------------------------
 echo
-echo "${BLUE}================ SUMMARY ================${RESET}"
+echo "${BLUE}========= SUMMARY (claude-code-fix.sh $VERSION) =========${RESET}"
 if [[ "$CHANGED" -eq 1 && "$MODE" == "restore" ]]; then
     echo "${YELLOW}Original files were restored.${RESET}"
     echo "Fully close and reopen the restored apps."

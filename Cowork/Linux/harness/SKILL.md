@@ -59,12 +59,18 @@ Every Claude Desktop update replaces `cowork-linux-helper` and downloads a new V
 ```bash
 REPO="$HOME/.local/share/claude-code-sigill-fix"
 if [ -d "$REPO/.git" ]; then
-    git -C "$REPO" pull --ff-only
+    git -C "$REPO" fetch --quiet --tags --force origin
 else
-    git clone https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix.git "$REPO"
+    git clone --quiet https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix.git "$REPO"
 fi
+# Use the newest release tag, not the tip of main (see CHANGELOG.md).
+TAG="$(git -C "$REPO" tag --list 'v*' --sort=-v:refname | head -n 1)"
+git -C "$REPO" -c advice.detachedHead=false checkout --quiet "${TAG:-origin/main}"
+echo "using ${TAG:-main (no release tag yet)}"
 FIX="$REPO/Cowork/Linux/fix/cowork-fix.sh"
 ```
+
+The script is pinned to the newest release tag (`vX.Y.Z`). Only the step above moves it to a newer release: scheduled runs keep using the checked-out version until this step runs again. `bash "$FIX" --version` shows which version is in use.
 
 ### Step 2: run it
 
