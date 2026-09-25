@@ -2,7 +2,7 @@
 # cowork-fix.sh
 #
 # Gets Claude Desktop's Cowork feature working on Linux, especially on old,
-# slow CPUs without AVX/AVX2/SSE4.2 (e.g. Core 2 Duo).
+# slow CPUs without AVX2 (e.g. Core 2 Duo).
 #
 # Targets:
 #   1. QEMU / KVM prerequisites ("Cowork requires QEMU")
@@ -21,6 +21,7 @@
 #   ./cowork-fix.sh                interactive menu
 #   ./cowork-fix.sh 1 3            run targets 1 and 3 without the menu
 #   ./cowork-fix.sh --restore      undo the fixes (packages stay installed)
+#   ./cowork-fix.sh --version      print the script version
 #   Exit code is 1 if any step failed, 0 otherwise.
 #
 # Not an official Anthropic tool. Use at your own risk.
@@ -47,7 +48,9 @@ skip()   { echo "  [SKIP]    $1"; }
 warn()   { echo "  ${YELLOW}[WARN]${RESET}    $1"; }
 fail()   { echo "  ${RED}[ERROR]${RESET}   $1"; FAILED=1; }
 
-usage() { sed -n '/^# Usage:/,/^#   Exit code/p' "$0" | sed 's/^# \{0,1\}//'; }
+VERSION="1.0.0"  # keep in sync with CHANGELOG.md
+
+usage() { echo "cowork-fix.sh $VERSION"; echo; sed -n '/^# Usage:/,/^#   Exit code/p' "$0" | sed 's/^# \{0,1\}//'; }
 
 # Shows a root command and asks before it runs. Without a terminal it only
 # prints the command so the user can run it.
@@ -71,6 +74,7 @@ for arg in "$@"; do
     case "$arg" in
         --restore)  MODE="restore" ;;
         -h|--help)  usage; exit 0 ;;
+        --version)  echo "cowork-fix.sh $VERSION"; exit 0 ;;
         *)          NUMS+=("$arg") ;;
     esac
 done
@@ -109,6 +113,8 @@ else
 fi
 
 DISTRO=""
+# os-release is read from the user's system at run time.
+# shellcheck source=/dev/null
 [[ -r /etc/os-release ]] && DISTRO=" $(. /etc/os-release; echo "${ID:-} ${ID_LIKE:-}") "
 
 # --- 1) QEMU / KVM prerequisites ---------------------------------------------
@@ -181,7 +187,11 @@ unlink_expected() {
         dest="$(readlink "$target")"
         for c in "$@"; do
             if [[ "$dest" == "$c" ]]; then
-                confirm_sudo rm -f "$target" && restored "removed symlink $target" || fail "could not remove $target"
+                if confirm_sudo rm -f "$target"; then
+                    restored "removed symlink $target"
+                else
+                    fail "could not remove $target"
+                fi
                 return
             fi
         done
@@ -257,7 +267,11 @@ wrap() {
 
     if [[ "$MODE" == "restore" ]]; then
         if [[ -f "$real" ]]; then
-            mv -f "$real" "$target" && restored "unwrapped: $target" || fail "could not restore $target"
+            if mv -f "$real" "$target"; then
+                restored "unwrapped: $target"
+            else
+                fail "could not restore $target"
+            fi
         else
             ok "not wrapped: $target"
         fi
@@ -274,10 +288,12 @@ wrap() {
         fail "neither native binary nor .realbinary found: $target"
         return
     fi
-    printf '#!/usr/bin/env bash\nexec "%s" -hsw -- "%s" "$@"\n' "$SDE" "$real" > "$target" \
-        && chmod +x "$target" "$real" \
-        && patched "wrapped: $target" \
-        || fail "could not write wrapper: $target"
+    if printf '#!/usr/bin/env bash\nexec "%s" -hsw -- "%s" "$@"\n' "$SDE" "$real" > "$target" \
+        && chmod +x "$target" "$real"; then
+        patched "wrapped: $target"
+    else
+        fail "could not write wrapper: $target"
+    fi
 }
 
 fix_vm_cli() {
@@ -385,7 +401,7 @@ selected 3 && fix_timeout
 
 # --- Summary -----------------------------------------------------------------
 echo
-echo "${BLUE}================ SUMMARY ================${RESET}"
+echo "${BLUE}========= SUMMARY (cowork-fix.sh $VERSION) =========${RESET}"
 if [[ "$CHANGED" -eq 1 ]]; then
     [[ "$MODE" == "restore" ]] && echo "${YELLOW}Changes were undone.${RESET}" \
                                || echo "${YELLOW}Some fixes were (re)applied.${RESET}"
