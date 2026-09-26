@@ -30,6 +30,8 @@ Nothing below needs `sudo`, except installing Intel SDE as a system package. Tha
 
 This skill does not cover Claude Desktop's Cowork feature. For Cowork, use `Cowork/Linux/harness/SKILL.md` from the same repository.
 
+This skill is for Linux. For Windows, use `Claude-Code/Windows/harness/SKILL.md` from the same repository.
+
 ---
 
 ## Instructions for the agent
