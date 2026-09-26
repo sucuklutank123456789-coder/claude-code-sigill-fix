@@ -34,6 +34,8 @@ Other features:
 #### Other
 
 - `Claude-Code/Windows/harness/SKILL.md`, the matching agent skill.
+- `harness/SKILL.md`, a single entry-point skill: it detects the operating system and follows the Linux, Windows or Cowork instructions, and stops on macOS and ARM machines.
+- README: a note that the repository is not for macOS (Apple Silicon or Intel Macs).
 - README: Windows section and a Windows "Am I affected?" check.
 - The bug report form asks about Windows too.
 - CI runs PSScriptAnalyzer on the PowerShell script.

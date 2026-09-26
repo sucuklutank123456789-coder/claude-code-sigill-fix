@@ -15,6 +15,8 @@ Illegal instruction (core dumped)
 
 That crash is a `SIGILL`. On Windows, the same crash shows up as exception code `0xc000001d` (`STATUS_ILLEGAL_INSTRUCTION`) in the Application event log, or as an editor panel that never finishes loading. The Claude Code fix scripts work around it by running those binaries under [Intel SDE](https://www.intel.com/content/www/us/en/download/684897/intel-software-development-emulator.html), which emulates the missing instructions in software.
 
+> **Not for macOS.** This repository only covers x86-64 Linux and Windows. Apple Silicon Macs (M-series) run Claude Code as a native ARM program and don't hit this crash; if Claude Code crashes there, the cause is something else. Older Intel Macs without AVX2 may crash the same way, but there is no macOS fix here.
+
 > **Not an official Anthropic tool.** It modifies installed files of Claude Code and related apps. Use at your own risk.
 
 > ⚠️ **Expect Claude Code to run much slower than normal.** Every instruction the CPU lacks is emulated in software, so startup can take about a minute (even `claude --version`), and commands, tool calls and the IDE integrations respond noticeably slower than on a modern CPU. This fix makes Claude Code *work* on old hardware; it cannot make it fast.
@@ -54,6 +56,7 @@ Claude Code then runs natively at full speed. Only use the SDE workaround in thi
 ## Repository layout
 
 ```
+harness/                     SKILL.md              single entry-point skill for AI agent harnesses
 Claude-Code/Linux/fix/       claude-code-fix.sh    Claude Code SIGILL fix (Linux)
 Claude-Code/Linux/harness/   SKILL.md              skill for AI agent harnesses
 Claude-Code/Windows/fix/     claude-code-fix.ps1   Claude Code fix (Windows)
@@ -152,7 +155,9 @@ If your CPU does support AVX2, the script warns you and stops unless you confirm
 
 ## Using it from an AI agent (Hermes and others)
 
-[`Claude-Code/Linux/harness/SKILL.md`](Claude-Code/Linux/harness/SKILL.md) is a ready-made skill. With it, an agent harness such as Hermes Agent can:
+Install [`harness/SKILL.md`](harness/SKILL.md): one skill for every platform. It detects the operating system, follows the matching Linux, Windows or Cowork instructions from the newest release, and on macOS tells the user that this repository doesn't apply.
+
+The per-platform skills can also be installed on their own. [`Claude-Code/Linux/harness/SKILL.md`](Claude-Code/Linux/harness/SKILL.md) is the Linux one. With it, an agent harness such as Hermes Agent can:
 
 - detect the problem
 - apply the fix without `sudo`
