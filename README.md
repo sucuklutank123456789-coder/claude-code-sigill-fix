@@ -207,6 +207,11 @@ The native installer runs the freshly downloaded binary as part of installing. O
 
 This puts the original binaries back and resets the timeouts to their defaults.
 
+To remove everything afterwards:
+
+- **SDE:** delete `~/.local/opt/intel-sde`, or `paru -R intel-sde` / `yay -R intel-sde` if it came from the AUR.
+- **Agent skill:** if the skill set up the systemd timer, run `systemctl --user disable --now claude-code-fix.timer` and delete `~/.config/systemd/user/claude-code-fix.{service,timer}`. Delete the clone in `~/.local/share/claude-code-sigill-fix`.
+
 ## Troubleshooting
 
 - **`Subprocess initialization did not complete within 60000ms` in VS Code.** The extension was updated. Re-run the script and restart VS Code.
@@ -311,6 +316,14 @@ irm https://claude.ai/install.ps1 | iex
 The native installer runs the freshly downloaded binary, so on these CPUs it can crash itself. If it does, use the npm method instead.
 
 VS Code keeps the old extension folder next to the new one after an update. The script always patches the newest one.
+
+### Undoing the fix and removing it (Windows)
+
+`.\claude-code-fix.cmd -Restore 5` puts back every original binary, shim and timeout. After that, to remove everything:
+
+1. If the agent skill created a scheduled task: `schtasks /Delete /F /TN claude-code-fix`
+2. Delete `%LOCALAPPDATA%\claude-sigill-fix`. It holds SDE, the compiled wrappers, and the agent skill's clone of this repository. Only delete it after `-Restore`: before that, it also holds the original binaries.
+3. 7-Zip and the Visual C++ runtime stay installed; uninstall them from Settings → Apps if nothing else needs them.
 
 ### Troubleshooting (Windows)
 

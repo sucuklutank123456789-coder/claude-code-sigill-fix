@@ -31,6 +31,15 @@ body:
     validations:
       required: true
 
+  - type: input
+    id: sde-version
+    attributes:
+      label: Intel SDE version
+      description: "Linux: output of `sde64 -version` (or `intel-sde -version`). Windows: output of `sde.exe -version`, or the folder name, e.g. `sde-external-9.48.0-2024-11-25-win`."
+      placeholder: 9.48.0
+    validations:
+      required: true
+
   - type: textarea
     id: lscpu
     attributes:
@@ -44,7 +53,7 @@ body:
     id: distro
     attributes:
       label: Operating system
-      description: "Linux: output of `cat /etc/os-release`, and whether this is a virtual machine (`systemd-detect-virt`). Windows: output of `winver` or `[Environment]::OSVersion`, the SDE version you use, and whether this is a virtual machine."
+      description: "Linux: output of `cat /etc/os-release`, and whether this is a virtual machine (`systemd-detect-virt`). Windows: output of `winver` or `[Environment]::OSVersion`, and whether this is a virtual machine."
       render: text
     validations:
       required: true

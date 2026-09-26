@@ -177,6 +177,9 @@ if ($Targets.Count -gt 0) {
 # --- Requirement: Intel SDE ----------------------------------------------------
 $SdePage = "https://www.intel.com/content/www/us/en/download/684897/intel-software-development-emulator.html"
 $SdeWantedVersion = "9.48.0"
+# SHA-256 of Intel's SDE 9.48.0 Windows package. A downloaded package with a
+# different hash is rejected; while this is empty, the hash is only printed.
+$SdeSha256 = ""
 
 function Find-Sde {
     if ($Sde -ne "" -and $Sde -like "*.exe") {
@@ -296,6 +299,25 @@ function Expand-SdePackage([string]$Archive) {
     return $true
 }
 
+# Checks the package against $SdeSha256. Packages of other SDE versions can't be checked.
+function Test-SdeHash([string]$Archive) {
+    $hash = (Get-FileHash -LiteralPath $Archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ((Split-Path -Leaf $Archive) -notmatch [regex]::Escape("-$SdeWantedVersion-")) {
+        Write-Warn "not an SDE $SdeWantedVersion package, its SHA-256 can't be checked: $hash"
+        return $true
+    }
+    if ($SdeSha256 -eq "") {
+        Write-Warn "SHA-256 not verified (no known hash yet): $hash"
+        return $true
+    }
+    if ($hash -ne $SdeSha256.ToLowerInvariant()) {
+        Write-Fail "SHA-256 mismatch for $Archive (expected $SdeSha256, got $hash); not installed"
+        return $false
+    }
+    Write-Host "SHA-256 verified." -ForegroundColor Green
+    return $true
+}
+
 function Install-Sde {
     $archive = ""
     if ($Sde -ne "") {
@@ -330,16 +352,25 @@ function Install-Sde {
     }
     if (-not (Test-Path -LiteralPath $archive -PathType Leaf)) { Write-Fail "file not found: $archive"; return $false }
     if ($archive -like "*.exe") { return $true }
+    if (-not (Test-SdeHash $archive)) { return $false }
     $ok = Expand-SdePackage $archive
     if ($ok -and $Sde -eq "") { Remove-Item -LiteralPath (Join-Path $Base "download") -Recurse -Force -ErrorAction SilentlyContinue }
     return $ok
 }
 
 # Runs a real program under SDE: `sde.exe -version` alone doesn't show whether
-# SDE works on this CPU.
+# SDE works on this CPU. A passed test is remembered until sde.exe changes, so
+# scheduled runs don't pay for it every time.
 function Test-Sde([string]$Path) {
+    $stamp = Join-Path $Base "sde-tested.txt"
+    $item = Get-Item -LiteralPath $Path
+    $id = "$($item.FullName)|$($item.Length)|$($item.LastWriteTimeUtc.Ticks)"
+    if ((Test-Path -LiteralPath $stamp) -and (Get-Content -LiteralPath $stamp -Raw).Trim() -eq $id) { return $true }
     & $Path -hsw '--' cmd.exe /c exit 0 2>&1 | Out-Null
-    return ($LASTEXITCODE -eq 0)
+    if ($LASTEXITCODE -ne 0) { return $false }
+    New-Item -ItemType Directory -Force -Path $Base | Out-Null
+    [IO.File]::WriteAllText($stamp, $id)
+    return $true
 }
 
 $SdePath = ""
