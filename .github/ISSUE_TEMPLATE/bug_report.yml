@@ -7,20 +7,18 @@ body:
       value: |
         Thanks for reporting! Please fill in every field; most problems depend on the exact CPU, distribution and install method.
 
-        Before reporting a `SIGILL` / `Illegal instruction` crash, run this and check the result:
-        ```bash
-        grep -qw avx2 /proc/cpuinfo && echo "has AVX2" || echo "no AVX2"
-        ```
-        If it prints `has AVX2`, this repository does not apply to your crash. If you are inside a virtual machine, first try setting the VM's CPU type to `host` (see the README).
+        Before reporting a `SIGILL` / `Illegal instruction` / `0xc000001d` crash, check whether your CPU has AVX2 with the command in the README's "Am I affected?" section (Linux: `grep -qw avx2 /proc/cpuinfo && echo "has AVX2" || echo "no AVX2"`).
+        If it has AVX2, this repository does not apply to your crash. If you are inside a virtual machine, first try setting the VM's CPU type to `host` (see the README).
 
   - type: dropdown
     id: script
     attributes:
       label: Which script?
       options:
-        - claude-code-fix.sh (Claude Code)
-        - cowork-fix.sh (Cowork)
-        - Both
+        - claude-code-fix.sh (Claude Code, Linux)
+        - claude-code-fix.ps1 (Claude Code, Windows)
+        - cowork-fix.sh (Cowork, Linux)
+        - More than one
     validations:
       required: true
 
@@ -28,7 +26,7 @@ body:
     id: script-version
     attributes:
       label: Script version
-      description: Output of `./claude-code-fix.sh --version` or `./cowork-fix.sh --version`.
+      description: Output of `./claude-code-fix.sh --version`, `.\claude-code-fix.cmd -Version` or `./cowork-fix.sh --version`.
       placeholder: claude-code-fix.sh 1.0.0
     validations:
       required: true
@@ -36,8 +34,8 @@ body:
   - type: textarea
     id: lscpu
     attributes:
-      label: lscpu output
-      description: Output of `lscpu`.
+      label: CPU
+      description: "Linux: output of `lscpu`. Windows: output of `Get-CimInstance Win32_Processor | Format-List Name, Description`."
       render: text
     validations:
       required: true
@@ -45,8 +43,8 @@ body:
   - type: textarea
     id: distro
     attributes:
-      label: Linux distribution
-      description: Output of `cat /etc/os-release`. Also mention whether this is a virtual machine (`systemd-detect-virt`).
+      label: Operating system
+      description: "Linux: output of `cat /etc/os-release`, and whether this is a virtual machine (`systemd-detect-virt`). Windows: output of `winver` or `[Environment]::OSVersion`, the SDE version you use, and whether this is a virtual machine."
       render: text
     validations:
       required: true
@@ -56,7 +54,7 @@ body:
     attributes:
       label: Claude Code version
       description: |
-        Output of `claude --version`. If it crashes, take the version from the file path instead, e.g. `~/.local/share/claude/versions/<version>` or the VS Code extension folder name.
+        Output of `claude --version`. If it crashes, take the version from the file path instead, e.g. `~/.local/share/claude/versions/<version>` (Linux) or the VS Code extension folder name.
       placeholder: 2.1.240
     validations:
       required: true

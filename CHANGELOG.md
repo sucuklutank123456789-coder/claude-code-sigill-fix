@@ -2,15 +2,41 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-Every release is a git tag `vX.Y.Z` on `main`. The agent skills (`*/Linux/harness/SKILL.md`) check out the newest tag rather than the tip of `main`, so unreleased changes don't reach agents.
+Every release is a git tag `vX.Y.Z` on `main`. The agent skills (`*/*/harness/SKILL.md`) check out the newest tag rather than the tip of `main`, so unreleased changes don't reach agents.
 
 ## Releasing a new version
 
-1. Update `VERSION="X.Y.Z"` in both `Claude-Code/Linux/fix/claude-code-fix.sh` and `Cowork/Linux/fix/cowork-fix.sh`.
+1. Update the version in all three scripts: `VERSION="X.Y.Z"` in `Claude-Code/Linux/fix/claude-code-fix.sh` and `Cowork/Linux/fix/cowork-fix.sh`, and `$ScriptVersion = "X.Y.Z"` in `Claude-Code/Windows/fix/claude-code-fix.ps1`.
 2. Move the entries under [Unreleased] into a new `## [X.Y.Z] - YYYY-MM-DD` section.
 3. Merge to `main`, then tag that commit: `git tag vX.Y.Z && git push origin vX.Y.Z`, or create a GitHub release with that tag.
 
 ## [Unreleased]
+
+### Added
+
+#### `Claude-Code/Windows/fix/claude-code-fix.ps1`
+
+The Windows version of the Claude Code fix, with the same menu. Targets:
+
+- the CLI: the npm shims (`claude.cmd`, `claude.ps1`, `claude`) start `claude.exe` through SDE; the native installer's `claude.exe` is replaced with a wrapper
+- Claude Desktop's embedded CLI (Store / MSIX and regular installs)
+- the VS Code extension (also Insiders, VSCodium, Cursor and Windsurf), including the startup timeout patch
+- the Zed Claude Agent (ACP)
+
+Other features:
+
+- Wrappers are compiled with .NET Framework's `csc.exe`. VS Code and Zed get a wrapper that copies stdin/stdout/stderr itself, and their original binaries are kept outside the app folders, in `%LOCALAPPDATA%\claude-sigill-fix\real-bin`.
+- Installs Intel SDE 9.48.0 when it's missing (newer releases crash on CPUs without SSE4.2), and offers to install 7-Zip and the Visual C++ runtime with `winget`.
+- Tests SDE with a real program before using it.
+- `-Restore`, `-Sde`, `-InstallSde`, `-NoAdmin`, `-Version` and `-Help`.
+- `claude-code-fix.cmd`, a double-click launcher.
+
+#### Other
+
+- `Claude-Code/Windows/harness/SKILL.md`, the matching agent skill.
+- README: Windows section and a Windows "Am I affected?" check.
+- The bug report form asks about Windows too.
+- CI runs PSScriptAnalyzer on the PowerShell script.
 
 ## [1.0.0] - 2026-09-25
 
