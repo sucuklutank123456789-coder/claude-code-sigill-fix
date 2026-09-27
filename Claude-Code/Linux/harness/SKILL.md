@@ -3,7 +3,7 @@ name: claude-code-fix
 description: Keep Claude Code (CLI, Claude Desktop's embedded CLI, VS Code / Cursor / Windsurf extension, Zed agent) and Droid running on Linux machines whose CPU (or virtual CPU) lacks AVX2, where they crash with "Illegal instruction" (SIGILL). Use when one of them fails to start with SIGILL or "Illegal instruction (core dumped)", after any of them was updated, or when asked to update Claude Code on such a machine.
 ---
 
-# Claude Code SIGILL fix (Linux, no-AVX CPUs)
+# Claude Code SIGILL fix (Linux, no-AVX2 CPUs)
 
 ## For humans: adding this skill to your agent
 
@@ -38,7 +38,7 @@ This skill is for Linux. For Windows, use `Claude-Code/Windows/harness/SKILL.md`
 
 ### Background
 
-On CPUs without AVX2 (for example Core 2 Duo), Claude Code's native binaries crash with `SIGILL`. The fix script wraps every such binary so that it runs under Intel SDE, which emulates the missing instructions.
+On CPUs without AVX2 (for example Core 2 Duo, or Sandy/Ivy Bridge), Claude Code's native binaries crash with `SIGILL`. The fix script wraps every such binary so that it runs under Intel SDE, which emulates the missing instructions.
 
 Every update of Claude Code, the editor extensions, Zed's agent, Claude Desktop or Droid replaces a wrapped binary with a fresh one. After any update, the script must run again. The script is idempotent: it only touches what isn't patched yet, so running it when nothing changed is harmless.
 
@@ -128,6 +128,7 @@ Use `6` unless the user asked for specific targets.
   - `[OK]`: already patched.
   - `[PATCHED]`: fixed now. Tell the user to fully restart that app.
   - `[SKIP]`: not installed.
+  - `[WARN]`: a hint, nothing failed (for example, SDE is not visible inside a Flatpak editor). Pass it on to the user.
   - `[ERROR]`: report the line to the user verbatim.
 - **`timeout setting not found in ... extension.js`:** the extension changed in a way the script doesn't recognize. Tell the user; do not patch the file yourself.
 

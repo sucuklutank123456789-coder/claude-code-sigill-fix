@@ -155,6 +155,7 @@ Use `5` unless the user asked for specific targets.
   - `[OK]`: already patched.
   - `[PATCHED]`: fixed now. Tell the user to fully restart that app (for the CLI: open a new terminal).
   - `[SKIP]`: not installed.
+  - `[WARN]`: a hint, nothing failed (for example, the SDE package's SHA-256 could not be verified). Pass it on to the user.
   - `[ERROR]`: report the line to the user verbatim.
 - **`could not replace ... (close the app that uses it and re-run)`:** the app is running. Ask the user to close it, then run step 4 again.
 - **`timeout setting not found in ... extension.js`:** the extension changed in a way the script doesn't recognize. Tell the user; do not patch the file yourself.
@@ -219,4 +220,4 @@ schtasks /Delete /F /TN "claude-code-fix"
 powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $Fix -Restore 5
 ```
 
-This restores every original binary, shim and timeout. The files in `%LOCALAPPDATA%\claude-sigill-fix` (SDE and the compiled wrappers) stay; the user can delete that folder afterwards if they no longer need SDE.
+This restores every original binary, shim and timeout. `%LOCALAPPDATA%\claude-sigill-fix` stays: it holds SDE, the compiled wrappers and this repository's clone. If the user wants everything removed, point them to "Undoing the fix and removing it (Windows)" in the README: delete the scheduled task first (`schtasks /Delete /F /TN claude-code-fix`), then the folder. Never delete that folder before `-Restore`, since it also holds the original binaries.

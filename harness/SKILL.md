@@ -1,6 +1,6 @@
 ---
 name: claude-sigill-fix
-description: Entry point for keeping Claude Code (CLI, Claude Desktop's embedded CLI and Cowork, VS Code / Cursor / Windsurf extension, Zed agent) running on x86-64 Linux or Windows machines whose CPU (or virtual CPU) lacks AVX2, where they crash with "Illegal instruction" / SIGILL (Linux) or exception code 0xc000001d (Windows). Detects the operating system and follows the matching instructions from the repository; on macOS it explains that the fix does not apply. Use when Claude Code or one of these apps crashes right at startup or never finishes loading, after any of them was updated, or when asked to update Claude Code on such a machine.
+description: Entry point for keeping Claude Code (CLI, Claude Desktop's embedded CLI, VS Code / Cursor / Windsurf extension, Zed agent, and on Linux also Droid and Claude Desktop's Cowork) running on x86-64 Linux or Windows machines whose CPU (or virtual CPU) lacks AVX2, where they crash with "Illegal instruction" / SIGILL (Linux) or exception code 0xc000001d (Windows). Detects the operating system and follows the matching instructions from the repository; on macOS it explains that the fix does not apply. Use when Claude Code or one of these apps crashes right at startup or never finishes loading, after any of them was updated, or when asked to update Claude Code on such a machine.
 ---
 
 # Claude Code no-AVX2 fix: entry point (Linux, Windows; not macOS)
