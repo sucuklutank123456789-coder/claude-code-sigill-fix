@@ -65,24 +65,18 @@ Other features:
 - `-Restore`, `-Sde`, `-InstallSde`, `-NoAdmin`, `-Version` and `-Help`.
 - `claude-code-fix.cmd`, a double-click launcher.
 
-#### Windows: agent skill, docs and CI
-
-- `Claude-Code/Windows/harness/SKILL.md`, the matching agent skill.
-- `harness/SKILL.md`, a single entry-point skill: it detects the operating system and follows the Linux, Windows or Cowork instructions, and stops on macOS and ARM machines.
-- README: a note that the repository is not for macOS (Apple Silicon or Intel Macs), and how to remove everything.
-- README: Windows section and a Windows "Am I affected?" check.
-- The bug report form asks about Windows and the SDE version.
-- CI runs PSScriptAnalyzer on the PowerShell script.
-
 #### Agent skills
 
-`Claude-Code/Linux/harness/SKILL.md` and `Cowork/Linux/harness/SKILL.md` are drop-in skills for Hermes and other agent harnesses. The agent never uses `sudo`.
+Drop-in skills for Hermes and other agent harnesses. The agent never uses `sudo` or administrator rights.
+
+- `harness/SKILL.md`: a single entry point. It detects the operating system and follows the Linux, Windows or Cowork instructions, and stops on macOS and ARM machines.
+- `Claude-Code/Linux/harness/SKILL.md`, `Claude-Code/Windows/harness/SKILL.md` and `Cowork/Linux/harness/SKILL.md`: the per-platform skills.
 
 #### Repository
 
-- README sections: "Am I affected?", notes on scope and VMs, and "Related issues".
-- A bug report issue form.
-- A ShellCheck GitHub Actions workflow.
+- README: "Am I affected?" (Linux and Windows), notes on scope, VMs and macOS, a Windows section, how to remove everything, and "Related issues".
+- A bug report issue form, including the SDE version.
+- A Lint GitHub Actions workflow: ShellCheck, PSScriptAnalyzer, and a Windows job that builds the wrapper with `csc.exe` and tests it against a fake SDE.
 - This changelog.
 
 [Unreleased]: https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix/compare/v1.0.0...HEAD

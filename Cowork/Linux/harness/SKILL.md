@@ -103,6 +103,8 @@ bash "$FIX" 4 </dev/null
     bash "$REPO/Claude-Code/Linux/fix/claude-code-fix.sh" --no-sudo --install-sde 1 </dev/null
     ```
 
+    This also applies the Claude Code CLI fix (target 1), which is harmless: it only wraps a Claude Code CLI that is installed and not yet wrapped. Tell the user.
+
   - **`Log out and back in (or reboot)` in the summary:** the `kvm` group change only takes effect after that.
 
 When the output shows `[PATCHED]` or all root commands were done, tell the user to fully quit Claude Desktop and start it again.

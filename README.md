@@ -64,6 +64,7 @@ Claude-Code/Windows/fix/     claude-code-fix.ps1   Claude Code fix (Windows)
 Claude-Code/Windows/harness/ SKILL.md              skill for AI agent harnesses
 Cowork/Linux/fix/            cowork-fix.sh         Cowork fix
 Cowork/Linux/harness/        SKILL.md              skill for AI agent harnesses
+tests/                       windows-wrapper.ps1   CI test of the Windows wrapper
 ```
 
 The sections below up to [Windows](#windows) describe the Linux script. For Windows, see [Windows](#windows).
@@ -149,15 +150,13 @@ For unattended runs (cron, systemd timers, AI agents):
 
 After patching, **fully close and reopen** VS Code, Zed or Claude Desktop.
 
-The script is safe to re-run. It only touches what is not patched yet, and reports every step as `[OK]`, `[PATCHED]`, `[SKIP]` or `[ERROR]`.
+The script is safe to re-run. It only touches what is not patched yet, and reports every step as `[OK]`, `[PATCHED]`, `[SKIP]`, `[WARN]` or `[ERROR]`.
 
 If your CPU does support AVX2, the script warns you and stops unless you confirm. On such a CPU Claude Code runs natively, and wrapping it would only make it much slower.
 
-## Using it from an AI agent (Hermes and others)
+## Using it from an AI agent (Linux)
 
-Install [`harness/SKILL.md`](harness/SKILL.md): one skill for every platform. It detects the operating system, follows the matching Linux, Windows or Cowork instructions from the newest release, and on macOS tells the user that this repository doesn't apply.
-
-The per-platform skills can also be installed on their own. [`Claude-Code/Linux/harness/SKILL.md`](Claude-Code/Linux/harness/SKILL.md) is the Linux one. With it, an agent harness such as Hermes Agent can:
+The easiest way is [`harness/SKILL.md`](harness/SKILL.md), see [AI agents](#ai-agents-hermes-and-others) below. [`Claude-Code/Linux/harness/SKILL.md`](Claude-Code/Linux/harness/SKILL.md) is the Linux-only skill. With it, an agent harness such as Hermes Agent can:
 
 - detect the problem
 - apply the fix without `sudo`
@@ -166,7 +165,7 @@ The per-platform skills can also be installed on their own. [`Claude-Code/Linux/
 
 The file also explains how to install it as a skill.
 
-## ⚠️ Re-run the script after every update
+## ⚠️ Re-run the script after every update (Linux)
 
 Every update replaces the patched files with fresh native binaries, which crash with `SIGILL` again. This happens for Claude Code itself, the VS Code extension, Zed's agent, Claude Desktop and Droid.
 
@@ -176,7 +175,7 @@ Every update replaces the patched files with fresh native binaries, which crash 
 ./claude-code-fix.sh
 ```
 
-## ⚠️ Updating the Claude Code CLI
+## ⚠️ Updating the Claude Code CLI (Linux)
 
 **Do not use `claude update`.** It does not work on these machines; it fails with `Unable to fetch latest version from npm registry`. Update with the same method you installed with, then re-run the script.
 
@@ -198,7 +197,7 @@ curl -fsSL https://claude.ai/install.sh | bash
 
 The native installer runs the freshly downloaded binary as part of installing. On these CPUs that step can itself crash with `SIGILL`. If it does, use the npm method instead.
 
-## Undoing the fix
+## Undoing the fix (Linux)
 
 ```bash
 ./claude-code-fix.sh --restore        # menu
@@ -212,7 +211,7 @@ To remove everything afterwards:
 - **SDE:** delete `~/.local/opt/intel-sde`, or `paru -R intel-sde` / `yay -R intel-sde` if it came from the AUR.
 - **Agent skill:** if the skill set up the systemd timer, run `systemctl --user disable --now claude-code-fix.timer` and delete `~/.config/systemd/user/claude-code-fix.{service,timer}`. Delete the clone in `~/.local/share/claude-code-sigill-fix`.
 
-## Troubleshooting
+## Troubleshooting (Linux)
 
 - **`Subprocess initialization did not complete within 60000ms` in VS Code.** The extension was updated. Re-run the script and restart VS Code.
 - **`Illegal instruction` again.** Something was updated. Re-run the script.
@@ -366,6 +365,12 @@ chmod +x cowork-fix.sh
 - **Updates:** Re-run the script after Claude Desktop updates. An update restores the original `cowork-linux-helper` and brings a new VM CLI.
 - **AI agents:** [`Cowork/Linux/harness/SKILL.md`](Cowork/Linux/harness/SKILL.md) is the matching skill. The agent runs the script without `sudo` and hands the root commands to you.
 - **Tested on:** Arch-based systems only (Garuda). The apt, dnf and zypper package names and firmware paths are best guesses and are untested. Reports are welcome.
+
+## AI agents (Hermes and others)
+
+Install [`harness/SKILL.md`](harness/SKILL.md): one skill for every platform. It detects the operating system, follows the matching Linux, Windows or Cowork instructions from the newest release, and on macOS or ARM machines tells the user that this repository doesn't apply. The agent never uses `sudo` or administrator rights.
+
+The per-platform skills (`Claude-Code/Linux/harness`, `Claude-Code/Windows/harness`, `Cowork/Linux/harness`) can also be installed on their own. Each file explains how to install it.
 
 ## Related issues
 

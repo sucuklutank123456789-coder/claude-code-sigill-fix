@@ -32,7 +32,8 @@ jobs:
           if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
               Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
           }
-          $results = Invoke-ScriptAnalyzer -Path Claude-Code/Windows/fix/claude-code-fix.ps1 -Settings ./PSScriptAnalyzerSettings.psd1
+          $results = @('Claude-Code/Windows/fix/claude-code-fix.ps1', 'tests/windows-wrapper.ps1') |
+              ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Settings ./PSScriptAnalyzerSettings.psd1 }
           $results | Format-Table RuleName, Severity, Line, Message -AutoSize -Wrap
           if ($results) { exit 1 }
 
