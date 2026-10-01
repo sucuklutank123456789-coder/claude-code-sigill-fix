@@ -27,16 +27,16 @@ body:
     attributes:
       label: Script version
       description: Output of `./claude-code-fix.sh --version`, `.\claude-code-fix.cmd -Version` or `./cowork-fix.sh --version`.
-      placeholder: claude-code-fix.sh 1.0.0
+      placeholder: claude-code-fix.sh 1.1.0
     validations:
       required: true
 
   - type: input
     id: sde-version
     attributes:
-      label: Intel SDE version
-      description: "Linux: output of `sde64 -version` (or `intel-sde -version`). Windows: output of `sde.exe -version`, or the folder name, e.g. `sde-external-9.48.0-2024-11-25-win`."
-      placeholder: 9.48.0
+      label: Emulator and version
+      description: "The `Emulator:` line of the script output. Linux with QEMU: output of `qemu-x86_64 --version`. Intel SDE: output of `sde64 -version` / `sde.exe -version`, or the folder name, e.g. `sde-external-9.48.0-2024-11-25-win`."
+      placeholder: qemu-x86_64 version 9.2.0
     validations:
       required: true
 

@@ -100,10 +100,10 @@ bash "$FIX" 4 </dev/null
   - **`Intel SDE not found`:** SDE is needed for target 2. Ask for the user's consent (SDE is under Intel's own license). Then install it without sudo with the Claude Code fix script, and re-run step 2:
 
     ```bash
-    bash "$REPO/Claude-Code/Linux/fix/claude-code-fix.sh" --no-sudo --install-sde 1 </dev/null
+    bash "$REPO/Claude-Code/Linux/fix/claude-code-fix.sh" --engine=sde --setup-only --no-sudo --install-sde </dev/null
     ```
 
-    This also applies the Claude Code CLI fix (target 1), which is harmless: it only wraps a Claude Code CLI that is installed and not yet wrapped. Tell the user.
+    `--setup-only` installs SDE without touching any Claude Code target.
 
   - **`Log out and back in (or reboot)` in the summary:** the `kvm` group change only takes effect after that.
 

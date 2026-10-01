@@ -58,7 +58,7 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"  # the progress bar makes downloads very slow in Windows PowerShell
 
-$ScriptVersion = "1.0.0"  # keep in sync with CHANGELOG.md
+$ScriptVersion = "1.1.0"  # keep in sync with CHANGELOG.md
 $ScriptName = "claude-code-fix.ps1"
 
 # --- Output helpers ------------------------------------------------------------

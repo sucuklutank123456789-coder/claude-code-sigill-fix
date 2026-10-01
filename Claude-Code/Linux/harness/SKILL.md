@@ -26,7 +26,7 @@ mkdir -p ~/.hermes/skills/claude-code-fix
 cp SKILL.md ~/.hermes/skills/claude-code-fix/SKILL.md
 ```
 
-Nothing below needs `sudo`, except installing Intel SDE as a system package. That step is optional and the agent leaves it to you.
+Nothing below needs `sudo`, except installing QEMU's user-mode emulator once (for example `sudo pacman -S qemu-user`). The agent leaves that step to you. Without QEMU, the agent can use the much slower Intel SDE, but only after asking you.
 
 This skill does not cover Claude Desktop's Cowork feature. For Cowork, use `Cowork/Linux/harness/SKILL.md` from the same repository.
 
@@ -38,7 +38,7 @@ This skill is for Linux. For Windows, use `Claude-Code/Windows/harness/SKILL.md`
 
 ### Background
 
-On CPUs without AVX2 (for example Core 2 Duo, or Sandy/Ivy Bridge), Claude Code's native binaries crash with `SIGILL`. The fix script wraps every such binary so that it runs under Intel SDE, which emulates the missing instructions.
+On CPUs without AVX2 (for example Core 2 Duo, or Sandy/Ivy Bridge), Claude Code's native binaries crash with `SIGILL`. The fix script wraps every such binary so that it runs under an emulator that provides the missing instructions: QEMU's user-mode emulator (`qemu-x86_64 -cpu max`), or Intel SDE as a much slower fallback when QEMU can't be used.
 
 Every update of Claude Code, the editor extensions, Zed's agent, Claude Desktop or Droid replaces a wrapped binary with a fresh one. After any update, the script must run again. The script is idempotent: it only touches what isn't patched yet, so running it when nothing changed is harmless.
 
@@ -85,15 +85,30 @@ FIX="$REPO/Claude-Code/Linux/fix/claude-code-fix.sh"
 
 The script is pinned to the newest release tag (`vX.Y.Z`). Only the step above moves it to a newer release: scheduled runs keep using the checked-out version until this step runs again. `bash "$FIX" --version` shows which version is in use.
 
-### Step 3: make sure Intel SDE is available
+### Step 3: make sure an emulator is available
 
-The script looks for `intel-sde`, `sde64` or `sde` on `PATH`, and also for `~/.local/opt/intel-sde/sde64`.
+**QEMU (preferred).** Check for it:
 
-If SDE is missing:
+```bash
+command -v qemu-x86_64 || command -v qemu-x86_64-static || echo "QEMU missing"
+```
+
+If it's missing, ask the user to install it once; it needs sudo, so they run it themselves:
+
+| Distribution | Command |
+|--------------|---------|
+| Arch and Arch-based | `sudo pacman -S qemu-user` |
+| Debian, Ubuntu | `sudo apt-get install qemu-user` |
+| Fedora | `sudo dnf install qemu-user` |
+| openSUSE | `sudo zypper install qemu-linux-user` |
+
+**Intel SDE (fallback).** Only if the user can't or doesn't want to install QEMU. The script looks for `intel-sde`, `sde64` or `sde` on `PATH`, and also for `~/.local/opt/intel-sde/sde64`. Tell the user that SDE is much slower (about 30 seconds for `claude --version`, versus a few seconds with QEMU), and only use it if they agree. Without a terminal the script never falls back to SDE on its own: add `--engine=sde` to step 4 once the user agreed.
+
+If SDE is needed and missing:
 
 1. Tell the user that Intel SDE is Intel software under Intel's own license.
 2. Ask for their consent before the **first** install.
-3. Once they agree, add `--install-sde` to the run in step 4. Together with `--no-sudo`, this downloads Intel's Linux tarball into `~/.local/opt/intel-sde`, with no root needed.
+3. Once they agree, add `--engine=sde --install-sde` to the run in step 4. Together with `--no-sudo`, this downloads Intel's Linux tarball into `~/.local/opt/intel-sde`, with no root needed.
 
 If the user would rather have a system package (Arch: `paru -S intel-sde`), that needs sudo: give them the command and let them run it.
 
@@ -105,8 +120,11 @@ https://www.intel.com/content/www/us/en/download/684897/intel-software-developme
 
 ```bash
 bash "$FIX" --no-sudo 6 </dev/null
-# add --install-sde only after the user agreed to install SDE (step 3)
+# only if QEMU can't be used and the user agreed to SDE (step 3): add --engine=sde,
+# and --install-sde if SDE is missing too
 ```
+
+The output starts with `Emulator: QEMU` or `Emulator: Intel SDE`. If it says `No terminal to ask` and `Nothing changed`, QEMU is missing: go back to step 3. After QEMU is installed, running this step without `--engine=sde` rewrites existing SDE wrappers to use QEMU.
 
 The target numbers are:
 
@@ -128,7 +146,7 @@ Use `6` unless the user asked for specific targets.
   - `[OK]`: already patched.
   - `[PATCHED]`: fixed now. Tell the user to fully restart that app.
   - `[SKIP]`: not installed.
-  - `[WARN]`: a hint, nothing failed (for example, SDE is not visible inside a Flatpak editor). Pass it on to the user.
+  - `[WARN]`: a hint, nothing failed (for example, the emulator is not visible inside a Flatpak editor). Pass it on to the user.
   - `[ERROR]`: report the line to the user verbatim.
 - **`timeout setting not found in ... extension.js`:** the extension changed in a way the script doesn't recognize. Tell the user; do not patch the file yourself.
 
@@ -168,6 +186,8 @@ curl -fsSL https://claude.ai/install.sh | bash
 This installer runs the downloaded native binary, so on these CPUs it may crash with `SIGILL` itself. If it does, tell the user and suggest switching to the npm install.
 
 ### Automating it
+
+The commands below use QEMU. If the user chose SDE instead (step 3), add `--engine=sde` to them too: without a terminal, the script never picks SDE on its own and would stop with `Nothing changed`.
 
 Because every update undoes the fix, re-run step 4 on a schedule. Pick one of these; neither needs root.
 
