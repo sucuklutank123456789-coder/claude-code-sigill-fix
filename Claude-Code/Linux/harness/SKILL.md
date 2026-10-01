@@ -26,7 +26,7 @@ mkdir -p ~/.hermes/skills/claude-code-fix
 cp SKILL.md ~/.hermes/skills/claude-code-fix/SKILL.md
 ```
 
-Nothing below needs `sudo`, except installing Intel SDE as a system package. That step is optional and the agent leaves it to you.
+Nothing below needs `sudo`, except installing QEMU's user-mode emulator once (for example `sudo pacman -S qemu-user`). The agent leaves that step to you; without it, the script falls back to the much slower Intel SDE.
 
 This skill does not cover Claude Desktop's Cowork feature. For Cowork, use `Cowork/Linux/harness/SKILL.md` from the same repository.
 
@@ -38,7 +38,7 @@ This skill is for Linux. For Windows, use `Claude-Code/Windows/harness/SKILL.md`
 
 ### Background
 
-On CPUs without AVX2 (for example Core 2 Duo, or Sandy/Ivy Bridge), Claude Code's native binaries crash with `SIGILL`. The fix script wraps every such binary so that it runs under Intel SDE, which emulates the missing instructions.
+On CPUs without AVX2 (for example Core 2 Duo, or Sandy/Ivy Bridge), Claude Code's native binaries crash with `SIGILL`. The fix script wraps every such binary so that it runs under an emulator that provides the missing instructions: QEMU's user-mode emulator (`qemu-x86_64 -cpu max`), or Intel SDE as a much slower fallback when QEMU can't be used.
 
 Every update of Claude Code, the editor extensions, Zed's agent, Claude Desktop or Droid replaces a wrapped binary with a fresh one. After any update, the script must run again. The script is idempotent: it only touches what isn't patched yet, so running it when nothing changed is harmless.
 
@@ -85,11 +85,26 @@ FIX="$REPO/Claude-Code/Linux/fix/claude-code-fix.sh"
 
 The script is pinned to the newest release tag (`vX.Y.Z`). Only the step above moves it to a newer release: scheduled runs keep using the checked-out version until this step runs again. `bash "$FIX" --version` shows which version is in use.
 
-### Step 3: make sure Intel SDE is available
+### Step 3: make sure an emulator is available
 
-The script looks for `intel-sde`, `sde64` or `sde` on `PATH`, and also for `~/.local/opt/intel-sde/sde64`.
+**QEMU (preferred).** Check for it:
 
-If SDE is missing:
+```bash
+command -v qemu-x86_64 || command -v qemu-x86_64-static || echo "QEMU missing"
+```
+
+If it's missing, ask the user to install it once; it needs sudo, so they run it themselves:
+
+| Distribution | Command |
+|--------------|---------|
+| Arch and Arch-based | `sudo pacman -S qemu-user` |
+| Debian, Ubuntu | `sudo apt-get install qemu-user` |
+| Fedora | `sudo dnf install qemu-user` |
+| openSUSE | `sudo zypper install qemu-linux-user` |
+
+**Intel SDE (fallback).** Only if the user can't or doesn't want to install QEMU. The script looks for `intel-sde`, `sde64` or `sde` on `PATH`, and also for `~/.local/opt/intel-sde/sde64`. Tell the user that SDE is much slower (about a minute for `claude --version`, versus a few seconds with QEMU).
+
+If SDE is needed and missing:
 
 1. Tell the user that Intel SDE is Intel software under Intel's own license.
 2. Ask for their consent before the **first** install.
@@ -105,8 +120,10 @@ https://www.intel.com/content/www/us/en/download/684897/intel-software-developme
 
 ```bash
 bash "$FIX" --no-sudo 6 </dev/null
-# add --install-sde only after the user agreed to install SDE (step 3)
+# add --install-sde only if QEMU can't be used and the user agreed to install SDE (step 3)
 ```
+
+The output starts with `Emulator: QEMU` or `Emulator: Intel SDE`. If it says `Falling back to Intel SDE`, tell the user that installing QEMU (step 3) would make Claude Code much faster. After QEMU is installed, running this step again rewrites the existing SDE wrappers to use QEMU.
 
 The target numbers are:
 
@@ -128,7 +145,7 @@ Use `6` unless the user asked for specific targets.
   - `[OK]`: already patched.
   - `[PATCHED]`: fixed now. Tell the user to fully restart that app.
   - `[SKIP]`: not installed.
-  - `[WARN]`: a hint, nothing failed (for example, SDE is not visible inside a Flatpak editor). Pass it on to the user.
+  - `[WARN]`: a hint, nothing failed (for example, the emulator is not visible inside a Flatpak editor). Pass it on to the user.
   - `[ERROR]`: report the line to the user verbatim.
 - **`timeout setting not found in ... extension.js`:** the extension changed in a way the script doesn't recognize. Tell the user; do not patch the file yourself.
 

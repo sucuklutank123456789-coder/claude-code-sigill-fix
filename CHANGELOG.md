@@ -12,6 +12,23 @@ Every release is a git tag `vX.Y.Z` on `main`. The agent skills (`*/*/harness/SK
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-01
+
+### Changed
+
+- `Claude-Code/Linux/fix/claude-code-fix.sh` now runs Claude Code under QEMU's user-mode emulator (`qemu-x86_64 -cpu max`) instead of Intel SDE. It is much faster: `claude --version` takes a few seconds instead of about a minute. Tested by hand on a Core 2 Duo E8400 for the CLI, Claude Desktop, VS Code and Zed.
+  - If QEMU is missing, the script offers to install it with pacman, apt, dnf or zypper (needs sudo).
+  - QEMU is checked with a real program before use.
+  - Intel SDE stays as the fallback when QEMU can't be used.
+  - Existing SDE wrappers are rewritten to use QEMU on the next run, and back again with `--engine=sde`.
+- Linux skill, README and bug report form describe QEMU first and SDE as the fallback.
+- The Cowork skill installs SDE with `--setup-only`, without touching Claude Code targets.
+- Windows and Cowork scripts are unchanged apart from the version number.
+
+### Added
+
+- `claude-code-fix.sh` options: `--engine=qemu`, `--engine=sde`, `--install-qemu` and `--setup-only`.
+
 ## [1.0.0] - 2026-09-26
 
 First release.
@@ -79,5 +96,6 @@ Drop-in skills for Hermes and other agent harnesses. The agent never uses `sudo`
 - A Lint GitHub Actions workflow: ShellCheck, PSScriptAnalyzer, and a Windows job that builds the wrapper with `csc.exe` and tests it against a fake SDE.
 - This changelog.
 
-[Unreleased]: https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix/releases/tag/v1.0.0

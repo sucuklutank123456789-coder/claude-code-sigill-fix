@@ -11,7 +11,8 @@
 #      expects, and adds you to the kvm group. Needs sudo.
 #   2. Cowork VM CLI (~/.config/Claude/claude-code-vm/<version>/claude)
 #      Wraps it with Intel SDE like the Claude Code fix does. Only on CPUs
-#      without AVX2; needs SDE (the Claude Code fix script can install it).
+#      without AVX2; needs SDE (`claude-code-fix.sh --engine=sde --setup-only --install-sde`
+#      installs it).
 #   3. installSdk timeout ("request req-2 (installSdk) timed out after 30s")
 #      Raises the 30 s timeout compiled into cowork-linux-helper to 900 s.
 #      Needs sudo and python3. Not possible on AppImage installs.
@@ -48,7 +49,7 @@ skip()   { echo "  [SKIP]    $1"; }
 warn()   { echo "  ${YELLOW}[WARN]${RESET}    $1"; }
 fail()   { echo "  ${RED}[ERROR]${RESET}   $1"; FAILED=1; }
 
-VERSION="1.0.0"  # keep in sync with CHANGELOG.md
+VERSION="1.1.0"  # keep in sync with CHANGELOG.md
 
 usage() { echo "cowork-fix.sh $VERSION"; echo; sed -n '/^# Usage:/,/^#   Exit code/p' "$0" | sed 's/^# \{0,1\}//'; }
 

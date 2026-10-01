@@ -13,13 +13,16 @@ On such a machine every Claude Code surface dies immediately. On Linux it prints
 Illegal instruction (core dumped)
 ```
 
-That crash is a `SIGILL`. On Windows, the same crash shows up as exception code `0xc000001d` (`STATUS_ILLEGAL_INSTRUCTION`) in the Application event log, or as an editor panel that never finishes loading. The Claude Code fix scripts work around it by running those binaries under [Intel SDE](https://www.intel.com/content/www/us/en/download/684897/intel-software-development-emulator.html), which emulates the missing instructions in software.
+That crash is a `SIGILL`. On Windows, the same crash shows up as exception code `0xc000001d` (`STATUS_ILLEGAL_INSTRUCTION`) in the Application event log, or as an editor panel that never finishes loading. The Claude Code fix scripts work around it by running those binaries under an emulator that provides the missing instructions in software:
+
+- **Linux:** [QEMU user-mode emulation](https://www.qemu.org/docs/master/user/main.html) (`qemu-x86_64 -cpu max`), with [Intel SDE](https://www.intel.com/content/www/us/en/download/684897/intel-software-development-emulator.html) as a fallback.
+- **Windows:** Intel SDE.
 
 > **Not for macOS.** This repository only covers x86-64 Linux and Windows. Apple Silicon Macs (M-series) run Claude Code as a native ARM program and don't hit this crash; if Claude Code crashes there, the cause is something else. Older Intel Macs without AVX2 may crash the same way, but there is no macOS fix here.
 
 > **Not an official Anthropic tool.** It modifies installed files of Claude Code and related apps. Use at your own risk.
 
-> ⚠️ **Expect Claude Code to run much slower than normal.** Every instruction the CPU lacks is emulated in software, so startup can take about a minute (even `claude --version`), and commands, tool calls and the IDE integrations respond noticeably slower than on a modern CPU. This fix makes Claude Code *work* on old hardware; it cannot make it fast.
+> ⚠️ **Expect Claude Code to run slower than normal.** Every instruction the CPU lacks is emulated in software. With QEMU (the Linux default), `claude --version` takes a few seconds. With Intel SDE (Windows, and the Linux fallback) it takes about a minute, and commands, tool calls and the IDE integrations respond noticeably slower. This fix makes Claude Code *work* on old hardware; it cannot make it as fast as on a modern CPU.
 
 ## Am I affected?
 
@@ -75,7 +78,7 @@ Cowork, Claude Desktop's workspace feature, has its own separate issues. They ar
 
 | # | Target | What the script does |
 |---|--------|----------------------|
-| 1 | **Claude Code CLI**: npm install and the native installer | Wraps the binary with SDE |
+| 1 | **Claude Code CLI**: npm install and the native installer | Wraps the binary with the emulator |
 | 2 | **Claude Desktop**: embedded Claude Code CLI | Wraps the embedded CLI |
 | 3 | **VS Code extension**, also Insiders, VSCodium, Cursor, Windsurf and Flatpak builds | Wraps the bundled binary and raises the 60 s startup timeout to 900 s |
 | 4 | **Zed Claude Agent** (ACP) | Wraps the agent binary |
@@ -88,18 +91,38 @@ Each native binary is renamed to `<name>.realbinary` and replaced with a small w
 
 ```bash
 #!/usr/bin/env bash
+exec /usr/bin/qemu-x86_64 -cpu max /path/to/claude.realbinary "$@"
+```
+
+QEMU's user-mode emulator runs the binary with `-cpu max`, a virtual CPU with every instruction the binary needs, including AVX2. Programs that Claude Code starts (the shell, `git`, `rg` and so on) run natively, outside QEMU.
+
+**Intel SDE fallback.** If QEMU isn't installed and can't be installed (for example with `--no-sudo`), the script uses Intel SDE instead:
+
+```bash
 exec intel-sde -hsw -- /path/to/claude.realbinary "$@"
 ```
 
-`-hsw` makes SDE emulate a Haswell CPU, which has every instruction the binary needs.
+`-hsw` makes SDE emulate a Haswell CPU. SDE is much slower than QEMU: even `claude --version` can take about a minute.
 
-Emulation is **slow**: even `claude --version` can take about a minute. The IDE integrations would otherwise hit their startup timeouts, so the script raises those timeouts too.
+`--engine=qemu` or `--engine=sde` picks one emulator explicitly. Re-running the script with the other emulator rewrites the existing wrappers.
+
+Emulation still slows down startup, so the script also raises the IDE integrations' startup timeouts.
 
 ## Requirements (Linux)
 
 - Linux on x86-64
 - `bash`
-- **Intel SDE.** If it's missing, the script offers to install it:
+- **QEMU's user-mode emulator** (`qemu-x86_64`). If it's missing, the script offers to install it with your package manager (needs sudo):
+
+  | Distribution | Command |
+  |--------------|---------|
+  | Arch and Arch-based | `sudo pacman -S qemu-user` |
+  | Debian, Ubuntu | `sudo apt-get install qemu-user` |
+  | Fedora | `sudo dnf install qemu-user` |
+  | openSUSE | `sudo zypper install qemu-linux-user` |
+
+  Before using QEMU, the script checks that it can run a program (`qemu-x86_64 -cpu max /bin/true`).
+- **Intel SDE**, only as a fallback when QEMU can't be used. If it's needed and missing, the script offers to install it:
   - on Arch-based distros, through the AUR (`paru -S intel-sde` or `yay -S intel-sde`)
   - elsewhere, by downloading Intel's Linux tarball into `~/.local/opt/intel-sde` (needs `curl` or `wget`, and `tar` with `xz` support)
 
@@ -141,11 +164,13 @@ You can also skip the menu:
 For unattended runs (cron, systemd timers, AI agents):
 
 ```bash
-./claude-code-fix.sh --no-sudo --install-sde 6 </dev/null
+./claude-code-fix.sh --no-sudo 6 </dev/null
 ```
 
-- `--no-sudo` never calls `sudo`, so SDE is never installed from the AUR.
-- `--install-sde` installs SDE without asking if it is missing. Together with `--no-sudo`, it downloads SDE into `~/.local/opt/intel-sde`.
+- `--no-sudo` never calls `sudo`: QEMU is then never installed, and SDE never from the AUR. Install QEMU once yourself (see Requirements), and unattended runs use it.
+- `--install-qemu` installs QEMU without asking if it is missing (needs sudo).
+- `--install-sde` installs SDE without asking if it is needed (no usable QEMU) and missing. Together with `--no-sudo`, it downloads SDE into `~/.local/opt/intel-sde`.
+- `--setup-only` only checks or installs the emulator and doesn't touch any target.
 - The exit code is `1` if any step failed.
 
 After patching, **fully close and reopen** VS Code, Zed or Claude Desktop.
@@ -208,14 +233,16 @@ This puts the original binaries back and resets the timeouts to their defaults.
 
 To remove everything afterwards:
 
-- **SDE:** delete `~/.local/opt/intel-sde`, or `paru -R intel-sde` / `yay -R intel-sde` if it came from the AUR.
+- **QEMU:** uninstall the package you installed (for example `sudo pacman -R qemu-user`) if nothing else needs it.
+- **SDE**, if it was used: delete `~/.local/opt/intel-sde`, or `paru -R intel-sde` / `yay -R intel-sde` if it came from the AUR.
 - **Agent skill:** if the skill set up the systemd timer, run `systemctl --user disable --now claude-code-fix.timer` and delete `~/.config/systemd/user/claude-code-fix.{service,timer}`. Delete the clone in `~/.local/share/claude-code-sigill-fix`.
 
 ## Troubleshooting (Linux)
 
 - **`Subprocess initialization did not complete within 60000ms` in VS Code.** The extension was updated. Re-run the script and restart VS Code.
 - **`Illegal instruction` again.** Something was updated. Re-run the script.
-- **Flatpak editors.** A Flatpak sandbox can't see `/usr/bin/intel-sde`. Install SDE into `~/.local/opt/intel-sde` instead: remove the system package, or just download Intel's tarball there.
+- **Flatpak editors.** A Flatpak sandbox can't see the host's `/usr/bin/qemu-x86_64` or `/usr/bin/intel-sde`. Install SDE into `~/.local/opt/intel-sde` (`./claude-code-fix.sh --engine=sde --setup-only --install-sde --no-sudo`) and run the fix with `--engine=sde`.
+- **`could not run a test program`** for QEMU: the installed `qemu-x86_64` is broken or too old to know `-cpu max`. Update QEMU, or use `--engine=sde`.
 - **`timeout setting not found in extension.js`.** The extension's code changed and the script no longer recognizes the timeout. Please open an issue.
 
 ## Windows
@@ -360,7 +387,7 @@ chmod +x cowork-fix.sh
 - **sudo:** Steps 1 and 3 need root. The script shows every `sudo` command and asks before running it. Without a terminal it only prints the commands.
 - **Virtualization:** VT-x or AMD-V must be enabled in the BIOS.
 - **kvm group:** After being added to it, log out and back in (or reboot).
-- **Target 2** needs Intel SDE. The Claude Code script can install it with `--install-sde`.
+- **Target 2** needs Intel SDE. The Claude Code script can install it without touching anything else: `../../../Claude-Code/Linux/fix/claude-code-fix.sh --engine=sde --setup-only --install-sde`.
 - **AppImage installs:** The timeout patch doesn't work on the AppImage version of Claude Desktop. The image would have to be extracted and rebuilt by hand.
 - **Updates:** Re-run the script after Claude Desktop updates. An update restores the original `cowork-linux-helper` and brings a new VM CLI.
 - **AI agents:** [`Cowork/Linux/harness/SKILL.md`](Cowork/Linux/harness/SKILL.md) is the matching skill. The agent runs the script without `sudo` and hands the root commands to you.
@@ -386,7 +413,7 @@ Reports of `SIGILL` on CPUs that *do* have AVX2 have a different cause. This rep
 
 ## Tested on
 
-- Intel Core 2 Duo E8400, Garuda Linux (Arch-based)
+- Intel Core 2 Duo E8400, Garuda Linux (Arch-based): QEMU (`qemu-x86_64 -cpu max`) tested by hand for the CLI, Claude Desktop, VS Code and Zed, with `claude --version` under 5 seconds; SDE tested before that.
 - Intel Core 2 Duo E8400, Windows 10: the Windows method (SDE 9.48.0, npm shims, compiled wrappers, timeout patch) was worked out and tested by hand for the CLI, Claude Desktop, VS Code and Zed. The script that automates it is new; reports are welcome.
 
 Other distributions should work the same way but have not been tested yet. Reports are welcome.

@@ -7,13 +7,20 @@
 # "Illegal instruction (core dumped)" / SIGILL.
 #
 # How it works: every Claude Code native binary is renamed to
-# <name>.realbinary and replaced with a tiny wrapper that runs it
-# under Intel SDE with Haswell emulation (-hsw).
+# <name>.realbinary and replaced with a tiny wrapper that runs it under
+# an emulator that provides the missing instructions:
+#   - QEMU user-mode emulation (qemu-x86_64 -cpu max), the default. Fast:
+#     `claude --version` takes a few seconds.
+#   - Intel SDE with Haswell emulation (sde -hsw), the fallback when QEMU is
+#     not available. Much slower: `claude --version` takes about a minute.
 #
-# Safe to re-run: it only touches what an update has broken.
+# Safe to re-run: it only touches what an update has broken. Wrappers written
+# for the other emulator are rewritten.
 #
-# If Intel SDE is missing, it offers to install it (AUR on Arch-based
-# systems, otherwise the Linux tarball from Intel into ~/.local/opt/intel-sde).
+# If QEMU is missing, it offers to install it with the distro's package
+# manager (needs sudo). If that's not possible, it falls back to Intel SDE and
+# offers to install that (AUR on Arch-based systems, otherwise the Linux
+# tarball from Intel into ~/.local/opt/intel-sde).
 #
 # Usage:
 #   ./claude-code-fix.sh              interactive menu
@@ -21,9 +28,18 @@
 #   ./claude-code-fix.sh --restore    undo the fixes (menu or numbers too)
 #   ./claude-code-fix.sh --version    print the script version
 #
+# Options:
+#   --engine=qemu   use QEMU only (fail instead of falling back to SDE)
+#   --engine=sde    use Intel SDE only
+#   --setup-only    only check / install the emulator, don't touch any target
+#                   (e.g. --engine=sde --setup-only --install-sde installs SDE
+#                   for the Cowork fix)
+#
 # Options for unattended use (agents, cron, systemd timers):
-#   --no-sudo       never call sudo (SDE is then never installed from the AUR)
-#   --install-sde   install Intel SDE without asking if it is missing
+#   --no-sudo       never call sudo (QEMU is then never installed, and SDE
+#                   never from the AUR)
+#   --install-qemu  install QEMU without asking if it is missing (needs sudo)
+#   --install-sde   install Intel SDE without asking if it is needed and missing
 #                   (with --no-sudo it downloads into ~/.local/opt/intel-sde)
 #   Exit code is 1 if any step failed, 0 otherwise.
 #
@@ -58,7 +74,7 @@ skip()   { echo "  [SKIP]    $1"; }
 warn()   { echo "  ${YELLOW}[WARN]${RESET}    $1"; }
 fail()   { echo "  ${RED}[ERROR]${RESET}   $1"; FAILED=1; }
 
-VERSION="1.0.0"  # keep in sync with CHANGELOG.md
+VERSION="1.1.0"  # keep in sync with CHANGELOG.md
 
 usage() { echo "claude-code-fix.sh $VERSION"; echo; sed -n '/^# Usage:/,/^#   6\./p' "$0" | sed 's/^# \{0,1\}//'; }
 
@@ -66,12 +82,20 @@ usage() { echo "claude-code-fix.sh $VERSION"; echo; sed -n '/^# Usage:/,/^#   6\
 MODE="fix"
 NO_SUDO=0
 AUTO_SDE=0
+AUTO_QEMU=0
+ENGINE="auto"
+SETUP_ONLY=0
 NUMS=()
 for arg in "$@"; do
     case "$arg" in
         --restore)      MODE="restore" ;;
         --no-sudo)      NO_SUDO=1 ;;
         --install-sde)  AUTO_SDE=1 ;;
+        --install-qemu) AUTO_QEMU=1 ;;
+        --engine=qemu)  ENGINE="qemu" ;;
+        --setup-only)   SETUP_ONLY=1 ;;
+        --engine=sde)   ENGINE="sde" ;;
+        --engine=*)     echo "${RED}Unknown engine: ${arg#--engine=}${RESET} (use qemu or sde)"; exit 1 ;;
         -h|--help)  usage; exit 0 ;;
         --version)  echo "claude-code-fix.sh $VERSION"; exit 0 ;;
         *)          NUMS+=("$arg") ;;
@@ -79,7 +103,7 @@ for arg in "$@"; do
 done
 
 # --- CPU check ---------------------------------------------------------------
-# The native binaries need AVX2 (hence SDE's Haswell mode). A CPU that has it
+# The native binaries need AVX2 (hence -cpu max / -hsw). A CPU that has it
 # runs them natively, and wrapping them would only make them much slower.
 if [[ "$MODE" == "fix" ]] && grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
     echo "${YELLOW}Your CPU supports AVX2, so Claude Code should run natively.${RESET}"
@@ -108,7 +132,9 @@ parse_selection() {
 
 selected() { [[ "$SELECTED" == *" $1 "* ]]; }
 
-if [[ ${#NUMS[@]} -gt 0 ]]; then
+if [[ "$SETUP_ONLY" -eq 1 ]]; then
+    MODE="fix"
+elif [[ ${#NUMS[@]} -gt 0 ]]; then
     parse_selection "${NUMS[@]}" || { echo "${RED}Invalid choice: ${NUMS[*]}${RESET} (use numbers 1-6)"; exit 1; }
 else
     [[ "$MODE" == "fix" ]] && echo "Which one do you want to fix?" || echo "Which one do you want to restore?"
@@ -125,7 +151,46 @@ else
     done
 fi
 
-# --- Requirement: Intel SDE --------------------------------------------------
+# --- Emulator: QEMU user mode (preferred) -----------------------------------
+QEMU_CPU="max"
+
+find_qemu() { command -v qemu-x86_64 || command -v qemu-x86_64-static || true; }
+
+# Runs a real program under QEMU with the CPU model the wrappers use.
+qemu_works() { "$1" -cpu "$QEMU_CPU" /bin/true >/dev/null 2>&1; }
+
+# Installs QEMU's user-mode emulator with the distro's package manager.
+install_qemu() {
+    local distro="" cmd=()
+    # os-release is read from the user's system at run time.
+    # shellcheck source=/dev/null
+    [[ -r /etc/os-release ]] && distro=" $(. /etc/os-release; echo "${ID:-} ${ID_LIKE:-}") "
+    if [[ "$distro" == *" arch "* ]]; then
+        cmd=(pacman -S --needed qemu-user)
+    elif [[ "$distro" == *" debian "* || "$distro" == *" ubuntu "* ]]; then
+        cmd=(apt-get install -y qemu-user)
+    elif [[ "$distro" == *" fedora "* || "$distro" == *" rhel "* ]]; then
+        cmd=(dnf install -y qemu-user)
+    elif [[ "$distro" == *" suse "* ]]; then
+        cmd=(zypper install -y qemu-linux-user)
+    else
+        echo "Unknown distribution: install QEMU's user-mode emulator (qemu-x86_64) yourself."
+        return 1
+    fi
+    if [[ "$NO_SUDO" -eq 1 ]]; then
+        echo "Install it yourself with: sudo ${cmd[*]}"
+        return 1
+    fi
+    echo "It can be installed with: sudo ${cmd[*]}"
+    if [[ "$AUTO_QEMU" -ne 1 ]]; then
+        ANSWER=""
+        [[ -t 0 ]] && read -r -p "Install it now? [Y/n]: " ANSWER
+        [[ -t 0 && ( -z "$ANSWER" || "$ANSWER" =~ ^[Yy]$ ) ]] || return 1
+    fi
+    sudo "${cmd[@]}"
+}
+
+# --- Emulator: Intel SDE (fallback) ------------------------------------------
 SDE_PAGE="https://www.intel.com/content/www/us/en/download/684897/intel-software-development-emulator.html"
 SDE_HOME="$HOME/.local/opt/intel-sde"
 
@@ -189,8 +254,29 @@ install_sde() {
     install_sde_generic
 }
 
-SDE=""
-if [[ "$MODE" == "fix" ]]; then
+EMU=()  # the wrapper's command prefix, e.g. (qemu-x86_64 -cpu max)
+if [[ "$MODE" == "fix" && "$ENGINE" != "sde" ]]; then
+    QEMU="$(find_qemu)"
+    if [[ -z "$QEMU" ]]; then
+        echo "${YELLOW}QEMU user-mode emulator (qemu-x86_64) not found.${RESET}"
+        if install_qemu; then QEMU="$(find_qemu)"; fi
+    fi
+    if [[ -n "$QEMU" ]] && qemu_works "$QEMU"; then
+        EMU=("$QEMU" -cpu "$QEMU_CPU")
+        echo "${GREEN}Emulator: QEMU${RESET} ($QEMU -cpu $QEMU_CPU)"
+    elif [[ -n "$QEMU" ]]; then
+        echo "${RED}$QEMU could not run a test program ($QEMU -cpu $QEMU_CPU /bin/true).${RESET}"
+    fi
+    if [[ ${#EMU[@]} -eq 0 ]]; then
+        if [[ "$ENGINE" == "qemu" ]]; then
+            echo "QEMU is not usable and --engine=qemu was given. Install qemu-x86_64 and re-run."
+            exit 1
+        fi
+        echo "${YELLOW}Falling back to Intel SDE, which is much slower than QEMU.${RESET}"
+    fi
+fi
+
+if [[ "$MODE" == "fix" && ${#EMU[@]} -eq 0 ]]; then
     SDE="$(find_sde)"
     if [[ -z "$SDE" ]]; then
         echo "${RED}Intel SDE not found.${RESET} The fix does not work without SDE."
@@ -211,6 +297,13 @@ if [[ "$MODE" == "fix" ]]; then
         fi
         echo "${GREEN}Intel SDE installed:${RESET} $SDE"
     fi
+    EMU=("$SDE" -hsw --)
+    echo "${GREEN}Emulator: Intel SDE${RESET} ($SDE -hsw)"
+fi
+
+if [[ "$SETUP_ONLY" -eq 1 ]]; then
+    echo "Emulator ready; no targets were touched (--setup-only)."
+    exit 0
 fi
 
 # --- Wrapping ----------------------------------------------------------------
@@ -222,10 +315,18 @@ is_script() {
     [[ -f "$1" ]] && [[ "$(head -c 2 "$1" 2>/dev/null)" == '#!' ]]
 }
 
-# Wrap one native binary with the SDE wrapper (or undo that in restore mode).
+# The wrapper script for a .realbinary, for the emulator in use.
+wrapper_text() {
+    printf '#!/usr/bin/env bash\nexec'
+    printf ' %q' "${EMU[@]}" "$1"
+    printf ' "$@"\n'
+}
+
+# Wrap one native binary with the emulator wrapper (or undo that in restore mode).
 wrap() {
     local target="$1"
     local real="${target}.realbinary"
+    local text
 
     if [[ "$MODE" == "restore" ]]; then
         if [[ -f "$real" ]]; then
@@ -240,20 +341,21 @@ wrap() {
         return
     fi
 
+    text="$(wrapper_text "$real")"
     if is_script "$target" && [[ -f "$real" ]]; then
-        ok "already wrapped: $target"
-        return
-    fi
-
-    if is_elf "$target"; then
+        if [[ "$(cat "$target")" == "$text" ]]; then
+            ok "already wrapped: $target"
+            return
+        fi
+        # Written for the other emulator, or SDE / QEMU moved: rewrite it below.
+    elif is_elf "$target"; then
         mv -f "$target" "$real" || { fail "could not rename $target"; return; }
     elif [[ ! -f "$real" ]]; then
         fail "neither native binary nor .realbinary found: $target"
         return
     fi
 
-    if printf '#!/usr/bin/env bash\nexec "%s" -hsw -- "%s" "$@"\n' "$SDE" "$real" > "$target" \
-        && chmod +x "$target" "$real"; then
+    if printf '%s\n' "$text" > "$target" && chmod +x "$target" "$real"; then
         patched "wrapped: $target"
     else
         fail "could not write wrapper: $target"
@@ -346,9 +448,9 @@ fix_vscode() {
         [[ -n "$dir" ]] || continue
         found=1
 
-        # Flatpak apps have their own /usr, so SDE must live in the home directory.
-        if [[ "$MODE" == "fix" && "$root" == "$HOME/.var/app/"* && "$SDE" != "$HOME/"* ]]; then
-            warn "$SDE is not visible inside Flatpak; install SDE into $SDE_HOME instead"
+        # Flatpak apps have their own /usr, so the emulator must live in the home directory.
+        if [[ "$MODE" == "fix" && "$root" == "$HOME/.var/app/"* && "${EMU[0]}" != "$HOME/"* ]]; then
+            warn "${EMU[0]} is not visible inside Flatpak; install SDE into $SDE_HOME and use --engine=sde"
         fi
 
         wrap "$dir/resources/native-binary/claude"
