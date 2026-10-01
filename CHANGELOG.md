@@ -12,6 +12,13 @@ Every release is a git tag `vX.Y.Z` on `main`. The agent skills (`*/*/harness/SK
 
 ## [Unreleased]
 
+### Added
+
+- Linux wrappers check that their emulator still exists. If QEMU or SDE was removed or moved, starting Claude Code prints `claude-code-sigill-fix: emulator ... not found` and how to fix it, instead of a bare "No such file or directory". Wrappers from 1.1.0 are rewritten in the new form on the next run.
+- `claude-code-fix.sh` checks the SHA-256 of the Intel SDE Linux package it downloads against a list of known hashes and refuses a package that doesn't match. Packages not on the list are installed with a warning that shows their hash. The list is still empty, so for now every package gets that warning.
+- `tests/linux-fix.sh` and a `linux-fix` CI job: run `claude-code-fix.sh` with a real QEMU against fake installs (wrapping, argument / stdin / exit code passthrough, re-runs, SDE-to-QEMU rewrite, updated binaries, `--engine=sde`, a missing emulator, no QEMU without a terminal, `--restore`).
+- `SECURITY.md`: how to report security problems privately.
+
 ## [1.1.0] - 2026-10-01
 
 ### Changed

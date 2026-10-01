@@ -107,7 +107,9 @@ done
 # --- CPU check ---------------------------------------------------------------
 # The native binaries need AVX2 (hence -cpu max / -hsw). A CPU that has it
 # runs them natively, and wrapping them would only make them much slower.
-if [[ "$MODE" == "fix" ]] && grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
+# CLAUDE_SIGILL_FIX_CPUINFO is only for the tests (CI runners have AVX2).
+CPUINFO="${CLAUDE_SIGILL_FIX_CPUINFO:-/proc/cpuinfo}"
+if [[ "$MODE" == "fix" ]] && grep -qw avx2 "$CPUINFO" 2>/dev/null; then
     echo "${YELLOW}Your CPU supports AVX2, so Claude Code should run natively.${RESET}"
     echo "This fix is only for CPUs without AVX2 and would make everything much slower."
     ANSWER=""
@@ -212,6 +214,39 @@ fetch() {  # fetch URL [OUTFILE]; prints to stdout when OUTFILE is omitted
     fi
 }
 
+# SHA-256 of known Intel SDE Linux packages, one "<file name> <sha256>" per
+# line. A download with a listed name and a different hash is not installed;
+# a package that isn't listed (e.g. a newer release) is installed with a
+# warning that shows its hash.
+SDE_KNOWN_SHA256="
+"
+
+sha256_of() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | cut -d' ' -f1
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | cut -d' ' -f1
+    fi
+}
+
+verify_sde_package() {  # verify_sde_package FILE NAME
+    local hash want
+    hash="$(sha256_of "$1")"
+    if [[ -z "$hash" ]]; then
+        echo "${YELLOW}SHA-256 not verified: sha256sum is not installed.${RESET}"
+        return 0
+    fi
+    want="$(printf '%s\n' "$SDE_KNOWN_SHA256" | awk -v n="$2" '$1 == n { print $2 }')"
+    if [[ -z "$want" ]]; then
+        echo "${YELLOW}SHA-256 not verified (no known hash for $2):${RESET} $hash"
+    elif [[ "$hash" != "$want" ]]; then
+        echo "${RED}SHA-256 mismatch for $2${RESET} (expected $want, got $hash); not installed."
+        return 1
+    else
+        echo "${GREEN}SHA-256 verified.${RESET}"
+    fi
+}
+
 # Generic install: download the Linux tarball from Intel into ~/.local/opt/intel-sde.
 install_sde_generic() {
     local url tmp
@@ -227,13 +262,14 @@ install_sde_generic() {
     fi
     echo "Downloading $url"
     tmp="$(mktemp -d)"
-    if fetch "$url" "$tmp/sde.tar" && mkdir -p "$SDE_HOME" \
+    if fetch "$url" "$tmp/sde.tar" && verify_sde_package "$tmp/sde.tar" "${url##*/}" \
+        && mkdir -p "$SDE_HOME" \
         && tar -xf "$tmp/sde.tar" -C "$SDE_HOME" --strip-components=1; then
         rm -rf "$tmp"
         [[ -x "$SDE_HOME/sde64" ]]
     else
         rm -rf "$tmp"
-        echo "${RED}Download or extraction failed.${RESET}"
+        echo "${RED}Download, verification or extraction failed.${RESET}"
         return 1
     fi
 }
@@ -328,10 +364,16 @@ is_script() {
     [[ -f "$1" ]] && [[ "$(head -c 2 "$1" 2>/dev/null)" == '#!' ]]
 }
 
-# The wrapper script for a .realbinary, for the emulator in use.
+# The wrapper script for a .realbinary, for the emulator in use. If the
+# emulator disappears (package removed, SDE deleted), the wrapper says so on
+# stderr instead of failing with a bare "No such file or directory".
+# shellcheck disable=SC2016  # $emu and $@ are for the wrapper, not expanded here
 wrapper_text() {
-    printf '#!/usr/bin/env bash\nexec'
-    printf ' %q' "${EMU[@]}" "$1"
+    printf '#!/usr/bin/env bash\n'
+    printf 'emu=%q\n' "${EMU[0]}"
+    printf '%s\n' '[[ -x "$emu" ]] || { echo "claude-code-sigill-fix: emulator $emu not found. Reinstall it, or re-run claude-code-fix.sh." >&2; exit 127; }'
+    printf 'exec "$emu"'
+    printf ' %q' "${EMU[@]:1}" "$1"
     printf ' "$@"\n'
 }
 
@@ -360,7 +402,8 @@ wrap() {
             ok "already wrapped: $target"
             return
         fi
-        # Written for the other emulator, or SDE / QEMU moved: rewrite it below.
+        # Written for the other emulator, by an older version of this script, or
+        # SDE / QEMU moved: rewrite it below.
     elif is_elf "$target"; then
         mv -f "$target" "$real" || { fail "could not rename $target"; return; }
     elif [[ ! -f "$real" ]]; then
