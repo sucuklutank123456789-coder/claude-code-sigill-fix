@@ -22,7 +22,7 @@ Every release is a git tag `vX.Y.Z` on `main`. The agent skills (`*/*/harness/SK
   - Intel SDE stays as an optional fallback when QEMU can't be used. The script asks first and notes that SDE is much slower; without a terminal it stops unless `--engine=sde` is given.
   - Existing SDE wrappers are rewritten to use QEMU on the next run, and back again with `--engine=sde`.
 - Linux skill, README and bug report form describe QEMU first and SDE as the fallback.
-- The Cowork skill installs SDE with `--setup-only`, without touching Claude Code targets.
+- The Cowork skill, and `cowork-fix.sh`'s "Intel SDE not found" message, install SDE with `--engine=sde --setup-only --install-sde`, without touching Claude Code targets.
 - Windows and Cowork scripts are unchanged apart from the version number.
 
 ### Added

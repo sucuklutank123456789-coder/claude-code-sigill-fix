@@ -108,7 +108,7 @@ If SDE is needed and missing:
 
 1. Tell the user that Intel SDE is Intel software under Intel's own license.
 2. Ask for their consent before the **first** install.
-3. Once they agree, add `--install-sde` to the run in step 4. Together with `--no-sudo`, this downloads Intel's Linux tarball into `~/.local/opt/intel-sde`, with no root needed.
+3. Once they agree, add `--engine=sde --install-sde` to the run in step 4. Together with `--no-sudo`, this downloads Intel's Linux tarball into `~/.local/opt/intel-sde`, with no root needed.
 
 If the user would rather have a system package (Arch: `paru -S intel-sde`), that needs sudo: give them the command and let them run it.
 
@@ -186,6 +186,8 @@ curl -fsSL https://claude.ai/install.sh | bash
 This installer runs the downloaded native binary, so on these CPUs it may crash with `SIGILL` itself. If it does, tell the user and suggest switching to the npm install.
 
 ### Automating it
+
+The commands below use QEMU. If the user chose SDE instead (step 3), add `--engine=sde` to them too: without a terminal, the script never picks SDE on its own and would stop with `Nothing changed`.
 
 Because every update undoes the fix, re-run step 4 on a schedule. Pick one of these; neither needs root.
 

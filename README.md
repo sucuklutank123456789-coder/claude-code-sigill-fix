@@ -54,7 +54,7 @@ Try this first. A physical CPU with AVX2 can still look like it lacks AVX2 insid
 - **Proxmox:** Hardware → Processors → Type: `host`
 - **libvirt / virt-manager:** CPU model `host-passthrough`
 
-Claude Code then runs natively at full speed. Only use the SDE workaround in this repository if the host CPU itself has no AVX2, or if you can't change the VM's CPU type.
+Claude Code then runs natively at full speed. Only use the emulator workaround in this repository if the host CPU itself has no AVX2, or if you can't change the VM's CPU type.
 
 ## Repository layout
 
@@ -122,7 +122,7 @@ Emulation still slows down startup, so the script also raises the IDE integratio
   | openSUSE | `sudo zypper install qemu-linux-user` |
 
   Before using QEMU, the script checks that it can run a program (`qemu-x86_64 -cpu max /bin/true`).
-- **Intel SDE**, only as a fallback when QEMU can't be used. If it's needed and missing, the script offers to install it:
+- **Intel SDE**, only as a fallback when QEMU can't be used and you agree to use it. If it's needed and missing, the script offers to install it:
   - on Arch-based distros, through the AUR (`paru -S intel-sde` or `yay -S intel-sde`)
   - elsewhere, by downloading Intel's Linux tarball into `~/.local/opt/intel-sde` (needs `curl` or `wget`, and `tar` with `xz` support)
 
@@ -184,7 +184,7 @@ If your CPU does support AVX2, the script warns you and stops unless you confirm
 The easiest way is [`harness/SKILL.md`](harness/SKILL.md), see [AI agents](#ai-agents-hermes-and-others) below. [`Claude-Code/Linux/harness/SKILL.md`](Claude-Code/Linux/harness/SKILL.md) is the Linux-only skill. With it, an agent harness such as Hermes Agent can:
 
 - detect the problem
-- apply the fix without `sudo`
+- apply the fix without `sudo` (installing QEMU once is left to you)
 - update Claude Code the right way
 - re-apply the fix automatically after updates
 

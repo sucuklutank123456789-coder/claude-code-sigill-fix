@@ -27,7 +27,7 @@ body:
     attributes:
       label: Script version
       description: Output of `./claude-code-fix.sh --version`, `.\claude-code-fix.cmd -Version` or `./cowork-fix.sh --version`.
-      placeholder: claude-code-fix.sh 1.0.0
+      placeholder: claude-code-fix.sh 1.1.0
     validations:
       required: true
 
