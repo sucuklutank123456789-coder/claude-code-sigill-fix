@@ -26,7 +26,7 @@ mkdir -p ~/.hermes/skills/claude-code-fix
 cp SKILL.md ~/.hermes/skills/claude-code-fix/SKILL.md
 ```
 
-Nothing below needs `sudo`, except installing QEMU's user-mode emulator once (for example `sudo pacman -S qemu-user`). The agent leaves that step to you; without it, the script falls back to the much slower Intel SDE.
+Nothing below needs `sudo`, except installing QEMU's user-mode emulator once (for example `sudo pacman -S qemu-user`). The agent leaves that step to you. Without QEMU, the agent can use the much slower Intel SDE, but only after asking you.
 
 This skill does not cover Claude Desktop's Cowork feature. For Cowork, use `Cowork/Linux/harness/SKILL.md` from the same repository.
 
@@ -102,7 +102,7 @@ If it's missing, ask the user to install it once; it needs sudo, so they run it 
 | Fedora | `sudo dnf install qemu-user` |
 | openSUSE | `sudo zypper install qemu-linux-user` |
 
-**Intel SDE (fallback).** Only if the user can't or doesn't want to install QEMU. The script looks for `intel-sde`, `sde64` or `sde` on `PATH`, and also for `~/.local/opt/intel-sde/sde64`. Tell the user that SDE is much slower (about a minute for `claude --version`, versus a few seconds with QEMU).
+**Intel SDE (fallback).** Only if the user can't or doesn't want to install QEMU. The script looks for `intel-sde`, `sde64` or `sde` on `PATH`, and also for `~/.local/opt/intel-sde/sde64`. Tell the user that SDE is much slower (about 30 seconds for `claude --version`, versus a few seconds with QEMU), and only use it if they agree. Without a terminal the script never falls back to SDE on its own: add `--engine=sde` to step 4 once the user agreed.
 
 If SDE is needed and missing:
 
@@ -120,10 +120,11 @@ https://www.intel.com/content/www/us/en/download/684897/intel-software-developme
 
 ```bash
 bash "$FIX" --no-sudo 6 </dev/null
-# add --install-sde only if QEMU can't be used and the user agreed to install SDE (step 3)
+# only if QEMU can't be used and the user agreed to SDE (step 3): add --engine=sde,
+# and --install-sde if SDE is missing too
 ```
 
-The output starts with `Emulator: QEMU` or `Emulator: Intel SDE`. If it says `Falling back to Intel SDE`, tell the user that installing QEMU (step 3) would make Claude Code much faster. After QEMU is installed, running this step again rewrites the existing SDE wrappers to use QEMU.
+The output starts with `Emulator: QEMU` or `Emulator: Intel SDE`. If it says `No terminal to ask` and `Nothing changed`, QEMU is missing: go back to step 3. After QEMU is installed, running this step without `--engine=sde` rewrites existing SDE wrappers to use QEMU.
 
 The target numbers are:
 

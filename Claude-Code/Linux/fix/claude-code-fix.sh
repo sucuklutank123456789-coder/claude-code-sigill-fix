@@ -11,15 +11,16 @@
 # an emulator that provides the missing instructions:
 #   - QEMU user-mode emulation (qemu-x86_64 -cpu max), the default. Fast:
 #     `claude --version` takes a few seconds.
-#   - Intel SDE with Haswell emulation (sde -hsw), the fallback when QEMU is
-#     not available. Much slower: `claude --version` takes about a minute.
+#   - Intel SDE with Haswell emulation (sde -hsw), an optional fallback when
+#     QEMU is not available. Much slower: `claude --version` takes about
+#     30 seconds. The script asks before falling back to it.
 #
 # Safe to re-run: it only touches what an update has broken. Wrappers written
 # for the other emulator are rewritten.
 #
 # If QEMU is missing, it offers to install it with the distro's package
-# manager (needs sudo). If that's not possible, it falls back to Intel SDE and
-# offers to install that (AUR on Arch-based systems, otherwise the Linux
+# manager (needs sudo). If that's not possible, it asks whether to use Intel
+# SDE instead and offers to install that (AUR on Arch-based systems, otherwise the Linux
 # tarball from Intel into ~/.local/opt/intel-sde).
 #
 # Usage:
@@ -29,8 +30,9 @@
 #   ./claude-code-fix.sh --version    print the script version
 #
 # Options:
-#   --engine=qemu   use QEMU only (fail instead of falling back to SDE)
-#   --engine=sde    use Intel SDE only
+#   --engine=qemu   use QEMU only (never offer SDE)
+#   --engine=sde    use Intel SDE only (also the way to use SDE without a
+#                   terminal, where the script can't ask)
 #   --setup-only    only check / install the emulator, don't touch any target
 #                   (e.g. --engine=sde --setup-only --install-sde installs SDE
 #                   for the Cowork fix)
@@ -272,7 +274,18 @@ if [[ "$MODE" == "fix" && "$ENGINE" != "sde" ]]; then
             echo "QEMU is not usable and --engine=qemu was given. Install qemu-x86_64 and re-run."
             exit 1
         fi
-        echo "${YELLOW}Falling back to Intel SDE, which is much slower than QEMU.${RESET}"
+        echo "Intel SDE can be used instead. Note: SDE is much slower than QEMU"
+        echo "(\`claude --version\` takes about 30 seconds instead of a few)."
+        ANSWER=""
+        if [[ -t 0 ]]; then
+            read -r -p "Use Intel SDE instead of QEMU? [y/N]: " ANSWER
+        else
+            echo "No terminal to ask. Install QEMU and re-run, or pass --engine=sde to use SDE."
+        fi
+        if [[ ! "$ANSWER" =~ ^[Yy]$ ]]; then
+            echo "Nothing changed. Install QEMU (see the command above) and re-run."
+            exit 1
+        fi
     fi
 fi
 

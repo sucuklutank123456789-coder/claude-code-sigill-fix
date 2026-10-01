@@ -16,10 +16,10 @@ Every release is a git tag `vX.Y.Z` on `main`. The agent skills (`*/*/harness/SK
 
 ### Changed
 
-- `Claude-Code/Linux/fix/claude-code-fix.sh` now runs Claude Code under QEMU's user-mode emulator (`qemu-x86_64 -cpu max`) instead of Intel SDE. It is much faster: `claude --version` takes a few seconds instead of about a minute. Tested by hand on a Core 2 Duo E8400 for the CLI, Claude Desktop, VS Code and Zed.
+- `Claude-Code/Linux/fix/claude-code-fix.sh` now runs Claude Code under QEMU's user-mode emulator (`qemu-x86_64 -cpu max`) instead of Intel SDE. It is much faster: `claude --version` takes a few seconds instead of about 30 seconds. Tested by hand on a Core 2 Duo E8400 for the CLI, Claude Desktop, VS Code and Zed.
   - If QEMU is missing, the script offers to install it with pacman, apt, dnf or zypper (needs sudo).
   - QEMU is checked with a real program before use.
-  - Intel SDE stays as the fallback when QEMU can't be used.
+  - Intel SDE stays as an optional fallback when QEMU can't be used. The script asks first and notes that SDE is much slower; without a terminal it stops unless `--engine=sde` is given.
   - Existing SDE wrappers are rewritten to use QEMU on the next run, and back again with `--engine=sde`.
 - Linux skill, README and bug report form describe QEMU first and SDE as the fallback.
 - The Cowork skill installs SDE with `--setup-only`, without touching Claude Code targets.

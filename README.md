@@ -22,7 +22,7 @@ That crash is a `SIGILL`. On Windows, the same crash shows up as exception code 
 
 > **Not an official Anthropic tool.** It modifies installed files of Claude Code and related apps. Use at your own risk.
 
-> ⚠️ **Expect Claude Code to run slower than normal.** Every instruction the CPU lacks is emulated in software. With QEMU (the Linux default), `claude --version` takes a few seconds. With Intel SDE (Windows, and the Linux fallback) it takes about a minute, and commands, tool calls and the IDE integrations respond noticeably slower. This fix makes Claude Code *work* on old hardware; it cannot make it as fast as on a modern CPU.
+> ⚠️ **Expect Claude Code to run slower than normal.** Every instruction the CPU lacks is emulated in software. With QEMU (the Linux default), `claude --version` takes a few seconds. With Intel SDE (Windows, and the optional Linux fallback) it takes about 30 seconds or more, and commands, tool calls and the IDE integrations respond noticeably slower. This fix makes Claude Code *work* on old hardware; it cannot make it as fast as on a modern CPU.
 
 ## Am I affected?
 
@@ -96,13 +96,13 @@ exec /usr/bin/qemu-x86_64 -cpu max /path/to/claude.realbinary "$@"
 
 QEMU's user-mode emulator runs the binary with `-cpu max`, a virtual CPU with every instruction the binary needs, including AVX2. Programs that Claude Code starts (the shell, `git`, `rg` and so on) run natively, outside QEMU.
 
-**Intel SDE fallback.** If QEMU isn't installed and can't be installed (for example with `--no-sudo`), the script uses Intel SDE instead:
+**Intel SDE fallback.** If QEMU isn't installed and can't be installed (for example with `--no-sudo`), the script asks whether to use Intel SDE instead, with a note that it is much slower. Answer `y` to continue with SDE, or `n` (the default) to stop and install QEMU first. Without a terminal it can't ask, so it stops unless `--engine=sde` was given. The SDE wrapper looks like this:
 
 ```bash
 exec intel-sde -hsw -- /path/to/claude.realbinary "$@"
 ```
 
-`-hsw` makes SDE emulate a Haswell CPU. SDE is much slower than QEMU: even `claude --version` can take about a minute.
+`-hsw` makes SDE emulate a Haswell CPU. SDE is much slower than QEMU: `claude --version` takes about 30 seconds instead of a few.
 
 `--engine=qemu` or `--engine=sde` picks one emulator explicitly. Re-running the script with the other emulator rewrites the existing wrappers.
 
@@ -167,9 +167,9 @@ For unattended runs (cron, systemd timers, AI agents):
 ./claude-code-fix.sh --no-sudo 6 </dev/null
 ```
 
-- `--no-sudo` never calls `sudo`: QEMU is then never installed, and SDE never from the AUR. Install QEMU once yourself (see Requirements), and unattended runs use it.
+- `--no-sudo` never calls `sudo`: QEMU is then never installed, and SDE never from the AUR. Install QEMU once yourself (see Requirements), and unattended runs use it. Without QEMU, unattended runs stop unless `--engine=sde` is given.
 - `--install-qemu` installs QEMU without asking if it is missing (needs sudo).
-- `--install-sde` installs SDE without asking if it is needed (no usable QEMU) and missing. Together with `--no-sudo`, it downloads SDE into `~/.local/opt/intel-sde`.
+- `--install-sde` installs SDE without asking if SDE is used (`--engine=sde`, or the fallback was accepted) and missing. Together with `--no-sudo`, it downloads SDE into `~/.local/opt/intel-sde`.
 - `--setup-only` only checks or installs the emulator and doesn't touch any target.
 - The exit code is `1` if any step failed.
 
