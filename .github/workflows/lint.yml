@@ -19,7 +19,21 @@ jobs:
           shellcheck --version
           shellcheck \
             Claude-Code/Linux/fix/claude-code-fix.sh \
-            Cowork/Linux/fix/cowork-fix.sh
+            Cowork/Linux/fix/cowork-fix.sh \
+            tests/linux-fix.sh
+
+  linux-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Runs the fix script against fake installs in a throwaway home directory,
+      # with a real qemu-x86_64.
+      - name: Install QEMU user mode
+        run: sudo apt-get update && sudo apt-get install -y qemu-user
+
+      - name: Test the Linux fix script
+        run: bash tests/linux-fix.sh
 
   psscriptanalyzer:
     runs-on: ubuntu-latest

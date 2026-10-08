@@ -108,7 +108,7 @@ If SDE is needed and missing:
 
 1. Tell the user that Intel SDE is Intel software under Intel's own license.
 2. Ask for their consent before the **first** install.
-3. Once they agree, add `--engine=sde --install-sde` to the run in step 4. Together with `--no-sudo`, this downloads Intel's Linux tarball into `~/.local/opt/intel-sde`, with no root needed.
+3. Once they agree, add `--engine=sde --install-sde` to the run in step 4. Together with `--no-sudo`, this downloads Intel's Linux tarball into `~/.local/opt/intel-sde`, with no root needed. The script prints the package's SHA-256. If it reports `SHA-256 mismatch`, nothing was installed: tell the user and don't retry with another source.
 
 If the user would rather have a system package (Arch: `paru -S intel-sde`), that needs sudo: give them the command and let them run it.
 
@@ -148,6 +148,7 @@ Use `6` unless the user asked for specific targets.
   - `[SKIP]`: not installed.
   - `[WARN]`: a hint, nothing failed (for example, the emulator is not visible inside a Flatpak editor). Pass it on to the user.
   - `[ERROR]`: report the line to the user verbatim.
+- **`claude-code-sigill-fix: emulator ... not found`** (printed by Claude Code itself, not by the script): the emulator in the wrappers was removed or moved. Make sure one is installed again (step 3), then run step 4.
 - **`timeout setting not found in ... extension.js`:** the extension changed in a way the script doesn't recognize. Tell the user; do not patch the file yourself.
 
 ### Updating Claude Code

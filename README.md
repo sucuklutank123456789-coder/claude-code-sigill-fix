@@ -67,7 +67,9 @@ Claude-Code/Windows/fix/     claude-code-fix.ps1   Claude Code fix (Windows)
 Claude-Code/Windows/harness/ SKILL.md              skill for AI agent harnesses
 Cowork/Linux/fix/            cowork-fix.sh         Cowork fix
 Cowork/Linux/harness/        SKILL.md              skill for AI agent harnesses
-tests/                       windows-wrapper.ps1   CI test of the Windows wrapper
+tests/                       linux-fix.sh          CI test of the Linux script, with fake installs
+                             windows-wrapper.ps1   CI test of the Windows wrapper
+SECURITY.md                                        how to report a security problem
 ```
 
 The sections below up to [Windows](#windows) describe the Linux script. For Windows, see [Windows](#windows).
@@ -91,15 +93,19 @@ Each native binary is renamed to `<name>.realbinary` and replaced with a small w
 
 ```bash
 #!/usr/bin/env bash
-exec /usr/bin/qemu-x86_64 -cpu max /path/to/claude.realbinary "$@"
+emu=/usr/bin/qemu-x86_64
+[[ -x "$emu" ]] || { echo "claude-code-sigill-fix: emulator $emu not found. ..." >&2; exit 127; }
+exec "$emu" -cpu max /path/to/claude.realbinary "$@"
 ```
+
+If the emulator is removed later, the wrapper says so instead of failing with a bare "No such file or directory".
 
 QEMU's user-mode emulator runs the binary with `-cpu max`, a virtual CPU with every instruction the binary needs, including AVX2. Programs that Claude Code starts (the shell, `git`, `rg` and so on) run natively, outside QEMU.
 
 **Intel SDE fallback.** If QEMU isn't installed and can't be installed (for example with `--no-sudo`), the script asks whether to use Intel SDE instead, with a note that it is much slower. Answer `y` to continue with SDE, or `n` (the default) to stop and install QEMU first. Without a terminal it can't ask, so it stops unless `--engine=sde` was given. The SDE wrapper looks like this:
 
 ```bash
-exec intel-sde -hsw -- /path/to/claude.realbinary "$@"
+exec "$emu" -hsw -- /path/to/claude.realbinary "$@"   # emu=/usr/bin/intel-sde
 ```
 
 `-hsw` makes SDE emulate a Haswell CPU. SDE is much slower than QEMU: `claude --version` takes about 30 seconds instead of a few.
@@ -124,7 +130,7 @@ Emulation still slows down startup, so the script also raises the IDE integratio
   Before using QEMU, the script checks that it can run a program (`qemu-x86_64 -cpu max /bin/true`).
 - **Intel SDE**, only as a fallback when QEMU can't be used and you agree to use it. If it's needed and missing, the script offers to install it:
   - on Arch-based distros, through the AUR (`paru -S intel-sde` or `yay -S intel-sde`)
-  - elsewhere, by downloading Intel's Linux tarball into `~/.local/opt/intel-sde` (needs `curl` or `wget`, and `tar` with `xz` support)
+  - elsewhere, by downloading Intel's Linux tarball into `~/.local/opt/intel-sde` (needs `curl` or `wget`, and `tar` with `xz` support). The script prints the download's SHA-256 and refuses a package whose hash doesn't match a known one.
 
   SDE is Intel software under Intel's own license and is not included in this repository.
 - For the npm install of the CLI: Node.js 22 or newer. The official prebuilt Node.js binaries run fine on these CPUs.
@@ -242,6 +248,7 @@ To remove everything afterwards:
 - **`Subprocess initialization did not complete within 60000ms` in VS Code.** The extension was updated. Re-run the script and restart VS Code.
 - **`Illegal instruction` again.** Something was updated. Re-run the script.
 - **Flatpak editors.** A Flatpak sandbox can't see the host's `/usr/bin/qemu-x86_64` or `/usr/bin/intel-sde`. Install SDE into `~/.local/opt/intel-sde` (`./claude-code-fix.sh --engine=sde --setup-only --install-sde --no-sudo`) and run the fix with `--engine=sde`.
+- **`claude-code-sigill-fix: emulator ... not found`** when starting Claude Code: QEMU (or SDE) was uninstalled or moved. Install it again, or re-run the script to write wrappers for the emulator you have now.
 - **`could not run a test program`** for QEMU: the installed `qemu-x86_64` is broken or too old to know `-cpu max`. Update QEMU, or use `--engine=sde`.
 - **`timeout setting not found in extension.js`.** The extension's code changed and the script no longer recognizes the timeout. Please open an issue.
 
@@ -428,6 +435,10 @@ git checkout "$(git tag --list 'v*' --sort=-v:refname | head -n 1)"
 ```
 
 `./claude-code-fix.sh --version`, `.\claude-code-fix.cmd -Version` and `./cowork-fix.sh --version` print the script version. Please include it in [bug reports](https://github.com/sucuklutank123456789-coder/claude-code-sigill-fix/issues/new?template=bug_report.yml).
+
+## Security
+
+The scripts rename and replace program files, call `sudo` for package installs, and download Intel SDE. Please report security problems privately, as described in [SECURITY.md](SECURITY.md), not in a public issue.
 
 ## License
 
